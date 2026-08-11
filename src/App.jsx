@@ -2068,7 +2068,7 @@ function SecaoRanking({ titulo, icone, lista, sufixo, membros, onAbrirPerfil, co
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           {resto.map(([n, pts], i) => (
             <LinhaRanking
-              key={n}
+              key={`${n}-${i}`}
               posicao={comPodio ? i + 4 : i + 1}
               nome={n}
               pontos={pts}
