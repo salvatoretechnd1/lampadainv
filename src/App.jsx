@@ -1328,6 +1328,7 @@ function AbaMembros({ membros, meuNome, adicionarMembro, removerMembro, definirF
   const [novoNome, setNovoNome] = useState('');
   const [editandoAniversario, setEditandoAniversario] = useState(null);
   const souLider = souLiderDe(membros, meuNome);
+  const podeEditarFoto = (m) => souLider || (meuNome && m.nome.trim().toLowerCase() === meuNome.trim().toLowerCase());
 
   const [presenca, setPresenca] = useState(null);
   const [carregandoPresenca, setCarregandoPresenca] = useState(false);
@@ -1376,7 +1377,7 @@ function AbaMembros({ membros, meuNome, adicionarMembro, removerMembro, definirF
     <div style={{ padding: '4px 18px 100px' }}>
       <h2 style={{ fontFamily: 'Fraunces', fontWeight: 600, fontSize: 21, color: cor.texto, margin: '14px 0 4px' }}>Membros</h2>
       <p style={{ fontFamily: 'Inter', fontSize: 13, color: cor.mudo, margin: '0 0 16px' }}>
-        {membros.length} cadastrados{souLider ? ' · toque na foto para adicionar ou trocar.' : ' · apenas líderes podem editar.'}
+        {membros.length} cadastrados{souLider ? ' · toque na foto pra adicionar ou trocar (a de qualquer um).' : ' · toque na sua própria foto pra adicionar ou trocar.'}
       </p>
 
       {souLider && respostasHoje !== null && (
@@ -1463,7 +1464,7 @@ function AbaMembros({ membros, meuNome, adicionarMembro, removerMembro, definirF
                 </div>
               )}
               <div style={{ marginTop: 6 }}>
-                {souLider ? (
+                {podeEditarFoto(m) ? (
                   <label htmlFor={`foto-${m.id}`} style={{ cursor: 'pointer', position: 'relative', display: 'block' }}>
                     <Avatar nome={m.nome} foto={m.foto} tamanho={68} />
                     <div style={{ position: 'absolute', bottom: -2, right: -2, width: 22, height: 22, borderRadius: '50%', background: cor.ouro, display: 'flex', alignItems: 'center', justifyContent: 'center', border: `2px solid ${cor.bg}` }}>
@@ -1474,7 +1475,7 @@ function AbaMembros({ membros, meuNome, adicionarMembro, removerMembro, definirF
                   <Avatar nome={m.nome} foto={m.foto} tamanho={68} />
                 )}
               </div>
-              {souLider && (
+              {podeEditarFoto(m) && (
                 <input
                   id={`foto-${m.id}`} type="file" accept="image/*" style={{ display: 'none' }}
                   onChange={(e) => { if (e.target.files[0]) definirFoto(m.id, e.target.files[0]); e.target.value = ''; }}
@@ -2068,7 +2069,7 @@ function SecaoRanking({ titulo, icone, lista, sufixo, membros, onAbrirPerfil, co
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           {resto.map(([n, pts], i) => (
             <LinhaRanking
-              key={`${n}-${i}`}
+              key={n}
               posicao={comPodio ? i + 4 : i + 1}
               nome={n}
               pontos={pts}
