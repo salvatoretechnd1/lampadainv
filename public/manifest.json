@@ -1,0 +1,12 @@
+{
+  "name": "Lâmpada",
+  "short_name": "Lâmpada",
+  "description": "App criado para os jovens da Igreja de Nova Vida do Rio Comprido",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#161B33",
+  "theme_color": "#E3B23C",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
