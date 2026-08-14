@@ -846,6 +846,7 @@ function AbaQuiz({ nome }) {
   const [erro, setErro] = useState('');
   const [mostrarConfete, setMostrarConfete] = useState(false);
   const [avisoDestaque, setAvisoDestaque] = useState(null);
+  const [travadoPorSaida, setTravadoPorSaida] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -882,40 +883,45 @@ function AbaQuiz({ nome }) {
     setSelecoes(novas);
   };
 
+  const salvarResultado = async (acertos) => {
+    const registro = { score: acertos, total: perguntas.length, ts: Date.now() };
+    const mid = monthId(hoje);
+
+    const [rRespostas, rSemana, rMes] = await Promise.allSettled([
+      window.storage.get(`respostas:${did}`, true),
+      window.storage.get(`semana:${wid}`, true),
+      window.storage.get(`mes:${mid}`, true),
+    ]);
+
+    const todas = rRespostas.status === 'fulfilled' && rRespostas.value ? JSON.parse(rRespostas.value.value) : {};
+    todas[nome] = registro;
+
+    const dadosSemana = rSemana.status === 'fulfilled' && rSemana.value ? JSON.parse(rSemana.value.value) : { pontos: {}, trilha: {} };
+    dadosSemana.pontos[nome] = (dadosSemana.pontos[nome] || 0) + acertos;
+    dadosSemana.trilha[nome] = { ...(dadosSemana.trilha[nome] || {}), [diaAtual(hoje)]: true };
+
+    const rankMes = rMes.status === 'fulfilled' && rMes.value ? JSON.parse(rMes.value.value) : {};
+    rankMes[nome] = (rankMes[nome] || 0) + acertos;
+
+    await Promise.all([
+      window.storage.set(`respostas:${did}`, JSON.stringify(todas), true),
+      window.storage.set(`semana:${wid}`, JSON.stringify(dadosSemana), true),
+      window.storage.set(`mes:${mid}`, JSON.stringify(rankMes), true),
+    ]);
+
+    setSemana(dadosSemana.trilha[nome]);
+    setRespostasHoje(registro);
+    return registro;
+  };
+
   const enviar = async () => {
     if (selecoes.some((s) => s === null)) { setErro('Responda todas as perguntas antes de enviar.'); return; }
     setErro('');
     setEnviando(true);
     try {
       const acertos = selecoes.filter((s, i) => s === perguntas[i].c).length;
-      const registro = { score: acertos, total: perguntas.length, ts: Date.now() };
-      const mid = monthId(hoje);
-
-      const [rRespostas, rSemana, rMes] = await Promise.allSettled([
-        window.storage.get(`respostas:${did}`, true),
-        window.storage.get(`semana:${wid}`, true),
-        window.storage.get(`mes:${mid}`, true),
-      ]);
-
-      const todas = rRespostas.status === 'fulfilled' && rRespostas.value ? JSON.parse(rRespostas.value.value) : {};
-      todas[nome] = registro;
-
-      const dadosSemana = rSemana.status === 'fulfilled' && rSemana.value ? JSON.parse(rSemana.value.value) : { pontos: {}, trilha: {} };
-      dadosSemana.pontos[nome] = (dadosSemana.pontos[nome] || 0) + acertos;
-      dadosSemana.trilha[nome] = { ...(dadosSemana.trilha[nome] || {}), [diaAtual(hoje)]: true };
-
-      const rankMes = rMes.status === 'fulfilled' && rMes.value ? JSON.parse(rMes.value.value) : {};
-      rankMes[nome] = (rankMes[nome] || 0) + acertos;
-
-      await Promise.all([
-        window.storage.set(`respostas:${did}`, JSON.stringify(todas), true),
-        window.storage.set(`semana:${wid}`, JSON.stringify(dadosSemana), true),
-        window.storage.set(`mes:${mid}`, JSON.stringify(rankMes), true),
-      ]);
-
-      setSemana(dadosSemana.trilha[nome]);
-      setRespostasHoje(registro);
-      if (acertos === perguntas.length) {
+      const registro = await salvarResultado(acertos);
+      if (registro.score === registro.total) {
         setMostrarConfete(true);
         setTimeout(() => setMostrarConfete(false), 2600);
       }
@@ -925,6 +931,31 @@ function AbaQuiz({ nome }) {
       setEnviando(false);
     }
   };
+
+  const saiuDaTelaRef = useRef(false);
+  useEffect(() => {
+    const aoMudarVisibilidade = async () => {
+      if (respostasHoje || enviando) return;
+      if (document.hidden) {
+        saiuDaTelaRef.current = true;
+      } else if (saiuDaTelaRef.current) {
+        saiuDaTelaRef.current = false;
+        setEnviando(true);
+        try {
+          const acertos = selecoes.filter((s, i) => s !== null && s === perguntas[i].c).length;
+          await salvarResultado(acertos);
+          setTravadoPorSaida(true);
+        } catch (e) {
+          setErro('Não foi possível travar o quiz agora.');
+        } finally {
+          setEnviando(false);
+        }
+      }
+    };
+    document.addEventListener('visibilitychange', aoMudarVisibilidade);
+    return () => document.removeEventListener('visibilitychange', aoMudarVisibilidade);
+  }, [respostasHoje, enviando, selecoes, perguntas, nome, did, wid, hoje]);
+
 
   if (carregando) {
     return <div style={{ display: 'flex', justifyContent: 'center', padding: 60 }}><Loader2 className="spin" size={22} color={cor.ouro} /></div>;
@@ -1032,8 +1063,16 @@ function AbaQuiz({ nome }) {
 
       {respostasHoje ? (
         <>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'center', padding: '14px 0 6px', color: cor.mudo, fontFamily: 'Inter', fontSize: 13 }}>
-            <Lock size={14} /> Resultado travado até amanhã
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'center', padding: '12px 14px', margin: '2px 0 10px',
+            color: travadoPorSaida ? cor.erro : cor.mudo, fontFamily: 'Inter', fontSize: 12.5, textAlign: 'center',
+            background: travadoPorSaida ? 'rgba(193,102,107,0.10)' : 'transparent',
+            border: travadoPorSaida ? `1px solid ${cor.erro}` : 'none', borderRadius: 12,
+          }}>
+            {travadoPorSaida ? <AlertTriangle size={15} style={{ flexShrink: 0 }} /> : <Lock size={14} style={{ flexShrink: 0 }} />}
+            {travadoPorSaida
+              ? 'Quiz travado: você saiu da tela antes de terminar, então só contamos o que já tinha marcado.'
+              : 'Resultado travado até amanhã'}
           </div>
           <button
             onClick={() => compartilhar('Quiz Lâmpada', `Acertei ${respostasHoje.score}/${respostasHoje.total} no quiz da Lâmpada hoje! 🔥`)}
