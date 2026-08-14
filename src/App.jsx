@@ -3,6 +3,7 @@ import {
   Flame, BookOpen, Trophy, CalendarDays, Check, X, Lock, Crown, Users, Loader2,
   Camera, Mic, ChevronLeft, ChevronRight, Plus, Trash2, FileText,
   Sun, Moon, Share2, Cake, BellRing, ArrowLeft, Sparkles, LogOut, Gem, Award, RefreshCw,
+  CalendarClock, AlertTriangle,
   Megaphone, Clock, MapPin, Star, Pencil,
 } from 'lucide-react';
 
@@ -683,6 +684,7 @@ function OrbitaMembros({ membros, onSelecionar }) {
 function TelaNome({ onEntrar, membros, onCadastrarMembro }) {
   const [valor, setValor] = useState('');
   const [senha, setSenha] = useState('');
+  const [aniversario, setAniversario] = useState('');
   const [modo, setModo] = useState('entrar'); // 'entrar' | 'cadastrar'
   const [processando, setProcessando] = useState(false);
   const [erro, setErro] = useState('');
@@ -716,7 +718,7 @@ function TelaNome({ onEntrar, membros, onCadastrarMembro }) {
         await window.storage.set(chave, JSON.stringify({ senha }), true);
         const jaEhMembro = membros.some((m) => m.nome.trim().toLowerCase() === nomeLimpo.toLowerCase());
         if (!jaEhMembro && onCadastrarMembro) {
-          await onCadastrarMembro(nomeLimpo);
+          await onCadastrarMembro(nomeLimpo, aniversario.trim());
         }
         onEntrar(nomeLimpo);
       } else {
@@ -785,9 +787,23 @@ function TelaNome({ onEntrar, membros, onCadastrarMembro }) {
           style={{
             width: '100%', maxWidth: 280, padding: '13px 16px', borderRadius: 12,
             border: `1px solid ${cor.borda}`, background: cor.painel, color: cor.texto,
-            fontFamily: 'Inter', fontSize: 15, outline: 'none', marginBottom: 14,
+            fontFamily: 'Inter', fontSize: 15, outline: 'none', marginBottom: modo === 'cadastrar' ? 10 : 14,
           }}
         />
+
+        {modo === 'cadastrar' && (
+          <input
+            value={aniversario}
+            onChange={(e) => setAniversario(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && confirmar()}
+            placeholder="Seu aniversário — DD/MM (opcional)"
+            style={{
+              width: '100%', maxWidth: 280, padding: '13px 16px', borderRadius: 12,
+              border: `1px solid ${cor.borda}`, background: cor.painel, color: cor.texto,
+              fontFamily: 'Inter', fontSize: 15, outline: 'none', marginBottom: 14,
+            }}
+          />
+        )}
 
         {erro && <p style={{ color: cor.erro, fontFamily: 'Inter', fontSize: 12.5, margin: '-6px 0 14px', maxWidth: 280 }}>{erro}</p>}
 
@@ -1615,11 +1631,309 @@ function AbaAvisos({ membros, meuNome }) {
 }
 
 /* ---------------------------------------------------------
+   PAINEL: PLANEJAMENTO (calendário privado, só para líderes)
+--------------------------------------------------------- */
+function PainelPlanejamento({ membros, meuNome, onFechar }) {
+  const agora = new Date();
+  const [ano, setAno] = useState(agora.getFullYear());
+  const [mes, setMes] = useState(agora.getMonth());
+  const [dados, setDados] = useState({});
+  const [carregando, setCarregando] = useState(true);
+  const [diaSelecionado, setDiaSelecionado] = useState(null);
+  const [titulo, setTitulo] = useState('');
+  const [horario, setHorario] = useState('');
+  const [local, setLocal] = useState('');
+  const [endereco, setEndereco] = useState('');
+  const [obs, setObs] = useState('');
+  const [editandoId, setEditandoId] = useState(null);
+  const [salvando, setSalvando] = useState(false);
+
+  const mid = `${ano}-${pad(mes + 1)}`;
+  const semanas = gerarSemanasCompletas(ano, mes);
+  const hojeId = dateId(agora);
+
+  useEffect(() => {
+    (async () => {
+      setCarregando(true);
+      try {
+        const r = await window.storage.get(`planejamento:${mid}`, true);
+        setDados(r ? JSON.parse(r.value) : {});
+      } catch { setDados({}); }
+      setCarregando(false);
+      setDiaSelecionado(null);
+      limparFormulario();
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mid]);
+
+  const mudarMes = (delta) => {
+    let m = mes + delta, a = ano;
+    if (m < 0) { m = 11; a -= 1; }
+    if (m > 11) { m = 0; a += 1; }
+    setMes(m); setAno(a);
+  };
+
+  function limparFormulario() {
+    setEditandoId(null);
+    setTitulo(''); setHorario(''); setLocal(''); setEndereco(''); setObs('');
+  }
+
+  const selecionarDia = (d) => {
+    setDiaSelecionado(d);
+    limparFormulario();
+  };
+
+  const editarItem = (item) => {
+    setEditandoId(item.id);
+    setTitulo(item.titulo);
+    setHorario(item.horario || '');
+    setLocal(item.local || '');
+    setEndereco(item.endereco || '');
+    setObs(item.obs || '');
+  };
+
+  const salvar = async () => {
+    if (!diaSelecionado || !titulo.trim()) return;
+    setSalvando(true);
+    const dId = dateId(diaSelecionado);
+    let novo;
+    if (editandoId) {
+      novo = {
+        ...dados,
+        [dId]: (dados[dId] || []).map((item) => (
+          item.id === editandoId
+            ? { ...item, titulo: titulo.trim(), horario: horario.trim(), local: local.trim(), endereco: endereco.trim(), obs: obs.trim() }
+            : item
+        )),
+      };
+    } else {
+      const novoItem = { id: gerarId(), titulo: titulo.trim(), horario: horario.trim(), local: local.trim(), endereco: endereco.trim(), obs: obs.trim(), comentarios: [] };
+      novo = { ...dados, [dId]: [...(dados[dId] || []), novoItem] };
+    }
+    setDados(novo);
+    limparFormulario();
+    try { await window.storage.set(`planejamento:${mid}`, JSON.stringify(novo), true); } catch { /* tenta depois */ }
+    setSalvando(false);
+  };
+
+  const remover = async (dId, itemId) => {
+    const restantes = (dados[dId] || []).filter((item) => item.id !== itemId);
+    const novo = { ...dados };
+    if (restantes.length > 0) novo[dId] = restantes; else delete novo[dId];
+    setDados(novo);
+    if (editandoId === itemId) limparFormulario();
+    try { await window.storage.set(`planejamento:${mid}`, JSON.stringify(novo), true); } catch { /* tenta depois */ }
+  };
+
+  const comentar = async (dId, itemId, texto) => {
+    const atualizada = (dados[dId] || []).map((item) => (
+      item.id === itemId
+        ? { ...item, comentarios: [...(item.comentarios || []), { id: gerarId(), nome: meuNome, texto, ts: Date.now() }] }
+        : item
+    ));
+    const novo = { ...dados, [dId]: atualizada };
+    setDados(novo);
+    try { await window.storage.set(`planejamento:${mid}`, JSON.stringify(novo), true); } catch { /* tenta depois */ }
+  };
+
+  const itensDoDia = diaSelecionado ? (dados[dateId(diaSelecionado)] || []) : [];
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: cor.bg, zIndex: 60, overflowY: 'auto' }}>
+      <div style={{ width: '100%', maxWidth: 440, margin: '0 auto', padding: '20px 18px 60px', minHeight: '100%' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+          <button onClick={onFechar} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 4 }}>
+            <ArrowLeft size={18} color={cor.mudo} />
+          </button>
+          <CalendarClock size={17} color={cor.ouro} />
+          <span style={{ fontFamily: 'Fraunces', fontWeight: 600, fontSize: 17, color: cor.texto }}>Planejamento</span>
+        </div>
+        <p style={{ fontFamily: 'Inter', fontSize: 12, color: cor.mudo, margin: '2px 0 18px 32px' }}>Visível só pra líderes — pra organizar antes de publicar em Avisos.</p>
+
+        <div style={{ background: cor.painel, border: `1px solid ${cor.borda}`, borderRadius: 16, padding: 14 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+            <button onClick={() => mudarMes(-1)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 6 }}>
+              <ChevronLeft size={18} color={cor.mudo} />
+            </button>
+            <span style={{ fontFamily: 'Fraunces', fontWeight: 600, fontSize: 15, color: cor.texto }}>{MESES[mes]} {ano}</span>
+            <button onClick={() => mudarMes(1)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 6 }}>
+              <ChevronRight size={18} color={cor.mudo} />
+            </button>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 3, marginBottom: 6 }}>
+            {DIAS_SEMANA_COMPLETA.map((d) => (
+              <div key={d} style={{ textAlign: 'center', fontFamily: 'Inter', fontSize: 9.5, fontWeight: 700, color: cor.mudo, textTransform: 'uppercase' }}>{d}</div>
+            ))}
+          </div>
+
+          {carregando ? (
+            <div style={{ display: 'flex', justifyContent: 'center', padding: 40 }}><Loader2 className="spin" size={20} color={cor.ouro} /></div>
+          ) : (
+            semanas.map((semana, si) => (
+              <div key={si} style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 3, marginBottom: 3 }}>
+                {semana.map((d, di) => {
+                  if (!d) return <div key={di} />;
+                  const dId = dateId(d);
+                  const itens = dados[dId] || [];
+                  const ehHoje = dId === hojeId;
+                  const ehSelecionado = diaSelecionado && dateId(diaSelecionado) === dId;
+                  return (
+                    <button
+                      key={di}
+                      onClick={() => selecionarDia(d)}
+                      style={{
+                        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start', gap: 3,
+                        background: ehSelecionado ? 'rgba(227,178,60,0.16)' : ehHoje ? 'rgba(227,178,60,0.08)' : 'transparent',
+                        border: `1px solid ${ehSelecionado || ehHoje ? cor.ouro : cor.borda}`, borderRadius: 9, padding: '5px 1px', minHeight: 40,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      <span style={{ fontFamily: 'JetBrains Mono', fontSize: 10.5, color: ehHoje || ehSelecionado ? cor.ouro : cor.mudo, fontWeight: 700 }}>{d.getDate()}</span>
+                      {itens.length > 0 && (
+                        <div style={{ display: 'flex', gap: 2 }}>
+                          {itens.slice(0, 3).map((_, i) => (
+                            <span key={i} style={{ width: 4, height: 4, borderRadius: '50%', background: cor.ouro }} />
+                          ))}
+                        </div>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            ))
+          )}
+        </div>
+
+        {diaSelecionado && (
+          <div style={{ background: cor.painel, border: `1px solid ${cor.ouro}`, borderRadius: 16, padding: 16, marginTop: 14 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+              <span style={{ fontFamily: 'Inter', fontWeight: 700, fontSize: 13.5, color: cor.texto }}>
+                {diaSelecionado.getDate()} de {MESES[mes].toLowerCase()}
+              </span>
+              <button onClick={() => { setDiaSelecionado(null); limparFormulario(); }} style={{ background: 'transparent', border: 'none', cursor: 'pointer' }}>
+                <X size={16} color={cor.mudo} />
+              </button>
+            </div>
+
+            {itensDoDia.length > 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 14 }}>
+                {itensDoDia.map((item) => {
+                  const dId = dateId(diaSelecionado);
+                  return (
+                    <div key={item.id} style={{ background: cor.painelAlt, borderRadius: 10, padding: '10px 12px' }}>
+                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+                        <CalendarClock size={14} color={cor.ouro} style={{ marginTop: 2, flexShrink: 0 }} />
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <span style={{ fontFamily: 'Inter', fontWeight: 700, fontSize: 13.5, color: cor.texto }}>{item.titulo}</span>
+                          {(item.horario || item.local || item.endereco) && (
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginTop: 3 }}>
+                              {item.horario && (
+                                <span style={{ display: 'flex', alignItems: 'center', gap: 3, fontFamily: 'Inter', fontSize: 11.5, color: cor.mudo }}>
+                                  <Clock size={11} /> {item.horario}
+                                </span>
+                              )}
+                              {item.local && (
+                                <span style={{ fontFamily: 'Inter', fontSize: 11.5, color: cor.mudo }}>
+                                  <strong style={{ color: cor.texto }}>Local:</strong> {item.local}
+                                </span>
+                              )}
+                              {item.endereco && (
+                                <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontFamily: 'Inter', fontSize: 11.5, color: cor.mudo }}>
+                                  <a href={linkMapa(item.endereco)} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center' }}>
+                                    <MapPin size={12} color={cor.ouro} />
+                                  </a>
+                                  <span><strong style={{ color: cor.texto }}>Endereço:</strong> {item.endereco}</span>
+                                </span>
+                              )}
+                            </div>
+                          )}
+                          {item.obs && (
+                            <p style={{ fontFamily: 'Inter', fontSize: 11.5, color: cor.mudo, margin: '5px 0 0', lineHeight: 1.4 }}>
+                              <strong style={{ color: cor.texto }}>OBS:</strong> {item.obs}
+                            </p>
+                          )}
+                        </div>
+                        <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+                          <button onClick={() => editarItem(item)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 2 }}>
+                            <Pencil size={13} color={cor.mudo} />
+                          </button>
+                          <button onClick={() => remover(dId, item.id)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 2 }}>
+                            <Trash2 size={13} color={cor.mudo} />
+                          </button>
+                        </div>
+                      </div>
+                      <Comentarios comentarios={item.comentarios} meuNome={meuNome} onComentar={(texto) => comentar(dId, item.id, texto)} />
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            <input
+              value={titulo}
+              onChange={(e) => setTitulo(e.target.value)}
+              placeholder="Nome do item (ex: Reunião de planejamento)"
+              style={{ width: '100%', padding: '10px 12px', borderRadius: 9, border: `1px solid ${cor.borda}`, background: cor.bg, color: cor.texto, fontFamily: 'Inter', fontSize: 13.5, outline: 'none', marginBottom: 8 }}
+            />
+            <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+              <input
+                value={horario}
+                onChange={(e) => setHorario(e.target.value)}
+                placeholder="Horário"
+                style={{ flex: 1, minWidth: 0, padding: '10px 12px', borderRadius: 9, border: `1px solid ${cor.borda}`, background: cor.bg, color: cor.texto, fontFamily: 'Inter', fontSize: 13.5, outline: 'none' }}
+              />
+              <input
+                value={local}
+                onChange={(e) => setLocal(e.target.value)}
+                placeholder="Local"
+                style={{ flex: 1, minWidth: 0, padding: '10px 12px', borderRadius: 9, border: `1px solid ${cor.borda}`, background: cor.bg, color: cor.texto, fontFamily: 'Inter', fontSize: 13.5, outline: 'none' }}
+              />
+            </div>
+            <input
+              value={endereco}
+              onChange={(e) => setEndereco(e.target.value)}
+              placeholder="Endereço (opcional — abre no Google Maps)"
+              style={{ width: '100%', padding: '10px 12px', borderRadius: 9, border: `1px solid ${cor.borda}`, background: cor.bg, color: cor.texto, fontFamily: 'Inter', fontSize: 13.5, outline: 'none', marginBottom: 8 }}
+            />
+            <textarea
+              value={obs}
+              onChange={(e) => setObs(e.target.value)}
+              placeholder="OBS: informações extras"
+              rows={2}
+              style={{ width: '100%', padding: '10px 12px', borderRadius: 9, border: `1px solid ${cor.borda}`, background: cor.bg, color: cor.texto, fontFamily: 'Inter', fontSize: 13, outline: 'none', resize: 'vertical', marginBottom: 10 }}
+            />
+
+            {editandoId && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
+                <Pencil size={12} color={cor.ouro} />
+                <span style={{ fontFamily: 'Inter', fontSize: 11.5, color: cor.ouro, fontWeight: 600 }}>Editando</span>
+                <button onClick={limparFormulario} style={{ marginLeft: 'auto', background: 'transparent', border: 'none', cursor: 'pointer', fontFamily: 'Inter', fontSize: 11.5, color: cor.mudo, textDecoration: 'underline' }}>
+                  cancelar
+                </button>
+              </div>
+            )}
+            <button
+              onClick={salvar}
+              disabled={!titulo.trim() || salvando}
+              style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '10px', borderRadius: 9, border: 'none', background: titulo.trim() ? cor.ouro : cor.mudoSuave, color: titulo.trim() ? '#161B33' : cor.mudo, fontFamily: 'Inter', fontWeight: 700, fontSize: 13, cursor: titulo.trim() ? 'pointer' : 'default' }}
+            >
+              {editandoId ? <Pencil size={14} /> : <Plus size={14} />} {salvando ? 'Salvando…' : editandoId ? 'Salvar alterações' : 'Adicionar'}
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ---------------------------------------------------------
    ABA: MEMBROS
 --------------------------------------------------------- */
 function AbaMembros({ membros, meuNome, adicionarMembro, removerMembro, definirFoto, carregandoFotoId, alternarLider, definirAniversario, onAbrirPerfil }) {
   const [novoNome, setNovoNome] = useState('');
   const [editandoAniversario, setEditandoAniversario] = useState(null);
+  const [confirmandoExclusao, setConfirmandoExclusao] = useState(null);
   const souLider = souLiderDe(membros, meuNome);
   const podeEditarFoto = (m) => souLider || (meuNome && m.nome.trim().toLowerCase() === meuNome.trim().toLowerCase());
 
@@ -1736,7 +2050,7 @@ function AbaMembros({ membros, meuNome, adicionarMembro, removerMembro, definirF
             <div key={m.id} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, position: 'relative', paddingTop: 10, isolation: 'isolate' }}>
               {souLider && (
                 <button
-                  onClick={() => removerMembro(m.id)}
+                  onClick={() => setConfirmandoExclusao(m)}
                   style={{ position: 'absolute', top: 0, right: 4, background: cor.painelAlt, border: `1px solid ${cor.borda}`, borderRadius: '50%', width: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', zIndex: 2 }}
                 >
                   <X size={11} color={cor.mudo} />
@@ -1802,6 +2116,29 @@ function AbaMembros({ membros, meuNome, adicionarMembro, removerMembro, definirF
               )}
             </div>
           ))}
+        </div>
+      )}
+
+      {confirmandoExclusao && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 55, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }} onClick={() => setConfirmandoExclusao(null)}>
+          <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: 320, background: cor.painel, borderRadius: 18, padding: 22, textAlign: 'center' }}>
+            <div style={{ width: 44, height: 44, borderRadius: '50%', background: 'rgba(193,102,107,0.14)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}>
+              <AlertTriangle size={20} color={cor.erro} />
+            </div>
+            <p style={{ fontFamily: 'Fraunces', fontWeight: 600, fontSize: 16, color: cor.texto, margin: '0 0 6px' }}>Excluir {confirmandoExclusao.nome}?</p>
+            <p style={{ fontFamily: 'Inter', fontSize: 12.5, color: cor.mudo, margin: '0 0 18px', lineHeight: 1.5 }}>Essa pessoa some da lista de membros. O ranking e o histórico dela não são apagados.</p>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={() => setConfirmandoExclusao(null)} style={{ flex: 1, padding: '11px 0', borderRadius: 10, border: `1px solid ${cor.borda}`, background: 'transparent', color: cor.texto, fontFamily: 'Inter', fontWeight: 600, fontSize: 13.5, cursor: 'pointer' }}>
+                Cancelar
+              </button>
+              <button
+                onClick={() => { removerMembro(confirmandoExclusao.id); setConfirmandoExclusao(null); }}
+                style={{ flex: 1, padding: '11px 0', borderRadius: 10, border: 'none', background: cor.erro, color: '#fff', fontFamily: 'Inter', fontWeight: 700, fontSize: 13.5, cursor: 'pointer' }}
+              >
+                Excluir
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
@@ -2532,6 +2869,7 @@ export default function App() {
   const [tema, setTema] = useState('escuro');
   const [mostrarSplash, setMostrarSplash] = useState(true);
   const [perfilAberto, setPerfilAberto] = useState(null);
+  const [planejamentoAberto, setPlanejamentoAberto] = useState(false);
 
   const [membrosBase, setMembrosBase] = useState([]);
   const [fotos, setFotos] = useState({});
@@ -2646,8 +2984,8 @@ export default function App() {
     window.storage.set('meu-tema', novo, false).catch(() => {});
   };
 
-  const adicionarMembro = async (nomeNovo) => {
-    const novo = { id: gerarId(), nome: nomeNovo };
+  const adicionarMembro = async (nomeNovo, aniversarioNovo) => {
+    const novo = { id: gerarId(), nome: nomeNovo, aniversario: aniversarioNovo || undefined };
     const lista = [...membrosBase, novo];
     setMembrosBase(lista);
     try { await window.storage.set('membros', JSON.stringify(lista), true); } catch { /* tenta depois */ }
@@ -2722,6 +3060,11 @@ export default function App() {
                 <span style={{ fontFamily: 'Fraunces', fontWeight: 600, fontSize: 17, color: cor.texto }}>Lâmpada</span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                {souLiderDe(membros, nome) && (
+                  <button onClick={() => setPlanejamentoAberto(true)} title="Planejamento (líderes)" style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 4, display: 'flex' }}>
+                    <CalendarClock size={16} color={cor.mudo} />
+                  </button>
+                )}
                 <button onClick={alternarTema} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 4, display: 'flex' }}>
                   {tema === 'escuro' ? <Sun size={16} color={cor.mudo} /> : <Moon size={16} color={cor.mudo} />}
                 </button>
@@ -2784,6 +3127,8 @@ export default function App() {
         )}
       </div>
       {perfilAberto && <PerfilMembro membro={perfilAberto} onFechar={() => setPerfilAberto(null)} />}
+      {planejamentoAberto && <PainelPlanejamento membros={membros} meuNome={nome} onFechar={() => setPlanejamentoAberto(false)} />}
     </div>
   );
 }
+
