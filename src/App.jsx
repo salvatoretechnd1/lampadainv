@@ -4,7 +4,7 @@ import {
   Camera, Mic, ChevronLeft, ChevronRight, Plus, Trash2, FileText,
   Sun, Moon, Share2, Cake, BellRing, ArrowLeft, Sparkles, LogOut, Gem, Award, RefreshCw,
   CalendarClock, AlertTriangle,
-  Megaphone, Clock, MapPin, Star, Pencil,
+  Megaphone, Clock, MapPin, Star, Pencil, Send, CheckCircle2,
 } from 'lucide-react';
 
 /* ---------------------------------------------------------
@@ -1648,6 +1648,7 @@ function PainelPlanejamento({ membros, meuNome, onFechar }) {
   const [obs, setObs] = useState('');
   const [editandoId, setEditandoId] = useState(null);
   const [salvando, setSalvando] = useState(false);
+  const [publicandoId, setPublicandoId] = useState(null);
 
   const mid = `${ano}-${pad(mes + 1)}`;
   const semanas = gerarSemanasCompletas(ano, mes);
@@ -1735,6 +1736,26 @@ function PainelPlanejamento({ membros, meuNome, onFechar }) {
     const novo = { ...dados, [dId]: atualizada };
     setDados(novo);
     try { await window.storage.set(`planejamento:${mid}`, JSON.stringify(novo), true); } catch { /* tenta depois */ }
+  };
+
+  const publicarEmEventos = async (dId, item) => {
+    setPublicandoId(item.id);
+    try {
+      const r = await window.storage.get(`avisos:${mid}`, true);
+      const avisos = r ? JSON.parse(r.value) : {};
+      const novoEvento = {
+        id: gerarId(), titulo: item.titulo, horario: item.horario || '', local: item.local || '',
+        endereco: item.endereco || '', obs: item.obs || '', destaque: false, confirmacoes: {},
+      };
+      const novosAvisos = { ...avisos, [dId]: [...(avisos[dId] || []), novoEvento] };
+      await window.storage.set(`avisos:${mid}`, JSON.stringify(novosAvisos), true);
+
+      const atualizada = (dados[dId] || []).map((i) => (i.id === item.id ? { ...i, publicadoEm: Date.now() } : i));
+      const novo = { ...dados, [dId]: atualizada };
+      setDados(novo);
+      await window.storage.set(`planejamento:${mid}`, JSON.stringify(novo), true);
+    } catch { /* tenta depois */ }
+    setPublicandoId(null);
   };
 
   const itensDoDia = diaSelecionado ? (dados[dateId(diaSelecionado)] || []) : [];
@@ -1860,6 +1881,18 @@ function PainelPlanejamento({ membros, meuNome, onFechar }) {
                           )}
                         </div>
                         <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+                          <button
+                            onClick={() => !item.publicadoEm && publicarEmEventos(dId, item)}
+                            disabled={publicandoId === item.id}
+                            title={item.publicadoEm ? 'Já publicado em Eventos' : 'Publicar em Eventos'}
+                            style={{ background: 'transparent', border: 'none', cursor: item.publicadoEm ? 'default' : 'pointer', padding: 2 }}
+                          >
+                            {item.publicadoEm ? (
+                              <CheckCircle2 size={13} color={cor.ouro} />
+                            ) : (
+                              <Send size={13} color={publicandoId === item.id ? cor.mudoSuave : cor.mudo} />
+                            )}
+                          </button>
                           <button onClick={() => editarItem(item)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 2 }}>
                             <Pencil size={13} color={cor.mudo} />
                           </button>
@@ -1868,6 +1901,11 @@ function PainelPlanejamento({ membros, meuNome, onFechar }) {
                           </button>
                         </div>
                       </div>
+                      {item.publicadoEm && (
+                        <p style={{ fontFamily: 'Inter', fontSize: 10.5, color: cor.ouro, margin: '4px 0 0', display: 'flex', alignItems: 'center', gap: 4 }}>
+                          <CheckCircle2 size={11} /> Publicado em Eventos
+                        </p>
+                      )}
                       <Comentarios comentarios={item.comentarios} meuNome={meuNome} onComentar={(texto) => comentar(dId, item.id, texto)} />
                     </div>
                   );
