@@ -369,6 +369,7 @@ function linkMapa(endereco) {
 --------------------------------------------------------- */
 const pad = (n) => String(n).padStart(2, '0');
 const dateId = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const parseDateId = (id) => { const [a, m, d] = id.split('-').map(Number); return new Date(a, m - 1, d); };
 const monthId = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}`;
 function weekId(d) {
   const dt = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
@@ -1738,6 +1739,10 @@ function PainelPlanejamento({ membros, meuNome, onFechar }) {
 
   const itensDoDia = diaSelecionado ? (dados[dateId(diaSelecionado)] || []) : [];
 
+  const agenda = Object.entries(dados)
+    .flatMap(([dId, itens]) => itens.map((item) => ({ ...item, data: dId })))
+    .sort((a, b) => a.data.localeCompare(b.data) || (a.horario || '').localeCompare(b.horario || ''));
+
   return (
     <div style={{ position: 'fixed', inset: 0, background: cor.bg, zIndex: 60, overflowY: 'auto' }}>
       <div style={{ width: '100%', maxWidth: 440, margin: '0 auto', padding: '20px 18px 60px', minHeight: '100%' }}>
@@ -1920,6 +1925,37 @@ function PainelPlanejamento({ membros, meuNome, onFechar }) {
             >
               {editandoId ? <Pencil size={14} /> : <Plus size={14} />} {salvando ? 'Salvando…' : editandoId ? 'Salvar alterações' : 'Adicionar'}
             </button>
+          </div>
+        )}
+
+        {agenda.length > 0 && (
+          <div style={{ marginTop: 22 }}>
+            <h3 style={{ fontFamily: 'Fraunces', fontWeight: 600, fontSize: 16.5, color: cor.texto, margin: '0 0 12px' }}>Agenda de {MESES[mes]}</h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {agenda.map((item) => (
+                <button
+                  key={item.id}
+                  onClick={() => selecionarDia(parseDateId(item.data))}
+                  style={{ display: 'flex', alignItems: 'center', gap: 12, background: cor.painel, border: `1px solid ${cor.borda}`, borderRadius: 12, padding: '10px 13px', width: '100%', textAlign: 'left', cursor: 'pointer' }}
+                >
+                  <div style={{ width: 40, textAlign: 'center', flexShrink: 0 }}>
+                    <div style={{ fontFamily: 'JetBrains Mono', fontWeight: 700, fontSize: 15, color: cor.ouro }}>{item.data.slice(-2)}</div>
+                    <div style={{ fontFamily: 'Inter', fontSize: 9, color: cor.mudo, textTransform: 'uppercase' }}>{MESES[mes].slice(0, 3)}</div>
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontFamily: 'Inter', fontWeight: 600, fontSize: 13, color: cor.texto, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.titulo}</div>
+                    <div style={{ display: 'flex', gap: 10, marginTop: 2 }}>
+                      {item.horario && <span style={{ fontFamily: 'Inter', fontSize: 11, color: cor.mudo }}>{item.horario}</span>}
+                      {item.local && (
+                        <span style={{ fontFamily: 'Inter', fontSize: 11, color: cor.mudo }}>
+                          <strong style={{ color: cor.texto }}>Local:</strong> {item.local}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
           </div>
         )}
       </div>
@@ -3131,4 +3167,3 @@ export default function App() {
     </div>
   );
 }
-
