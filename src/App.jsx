@@ -2010,6 +2010,8 @@ function AbaMembros({ membros, meuNome, adicionarMembro, removerMembro, definirF
   const [confirmandoExclusao, setConfirmandoExclusao] = useState(null);
   const [confirmandoReset, setConfirmandoReset] = useState(false);
   const [resetando, setResetando] = useState(false);
+  const [confirmandoResetRanking, setConfirmandoResetRanking] = useState(false);
+  const [resetandoRanking, setResetandoRanking] = useState(false);
   const souLider = souLiderDe(membros, meuNome);
   const podeEditarFoto = (m) => souLider || (meuNome && m.nome.trim().toLowerCase() === meuNome.trim().toLowerCase());
 
@@ -2040,6 +2042,18 @@ function AbaMembros({ membros, meuNome, adicionarMembro, removerMembro, definirF
     } catch { /* alguma chave pode falhar, tenta seguir */ }
     setResetando(false);
     setConfirmandoReset(false);
+    window.location.reload();
+  };
+
+  const resetarRanking = async () => {
+    setResetandoRanking(true);
+    try {
+      const { keys } = await window.storage.list('', true);
+      const alvos = keys.filter((k) => k.startsWith('respostas:') || k.startsWith('semana:') || k.startsWith('mes:'));
+      await Promise.allSettled(alvos.map((k) => window.storage.delete(k, true)));
+    } catch { /* alguma chave pode falhar, tenta seguir */ }
+    setResetandoRanking(false);
+    setConfirmandoResetRanking(false);
     window.location.reload();
   };
 
@@ -2218,6 +2232,42 @@ function AbaMembros({ membros, meuNome, adicionarMembro, removerMembro, definirF
           >
             <AlertTriangle size={14} /> Resetar dados do grupo
           </button>
+
+          <p style={{ fontFamily: 'Inter', fontSize: 11.5, color: cor.mudo, margin: '14px 0 10px', lineHeight: 1.5 }}>
+            Ou apague só o ranking do quiz (pontos de hoje, da semana e do mês), mantendo membros, escalas, avisos e planejamento intactos.
+          </p>
+          <button
+            onClick={() => setConfirmandoResetRanking(true)}
+            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 14px', borderRadius: 10, border: `1px solid ${cor.erro}`, background: 'transparent', color: cor.erro, fontFamily: 'Inter', fontWeight: 600, fontSize: 12.5, cursor: 'pointer' }}
+          >
+            <AlertTriangle size={14} /> Resetar só o ranking do quiz
+          </button>
+        </div>
+      )}
+
+      {confirmandoResetRanking && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 55, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }} onClick={() => !resetandoRanking && setConfirmandoResetRanking(false)}>
+          <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: 320, background: cor.painel, borderRadius: 18, padding: 22, textAlign: 'center' }}>
+            <div style={{ width: 44, height: 44, borderRadius: '50%', background: 'rgba(193,102,107,0.14)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}>
+              <AlertTriangle size={20} color={cor.erro} />
+            </div>
+            <p style={{ fontFamily: 'Fraunces', fontWeight: 600, fontSize: 16, color: cor.texto, margin: '0 0 6px' }}>Tem certeza que deseja resetar o ranking?</p>
+            <p style={{ fontFamily: 'Inter', fontSize: 12.5, color: cor.mudo, margin: '0 0 18px', lineHeight: 1.5 }}>
+              Essa ação apaga <strong style={{ color: cor.texto }}>todos</strong> os pontos do quiz (hoje, semana e mês) de todo mundo. Membros, escalas, avisos e planejamento continuam intactos. Não tem como desfazer.
+            </p>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={() => setConfirmandoResetRanking(false)} disabled={resetandoRanking} style={{ flex: 1, padding: '11px 0', borderRadius: 10, border: `1px solid ${cor.borda}`, background: 'transparent', color: cor.texto, fontFamily: 'Inter', fontWeight: 600, fontSize: 13.5, cursor: 'pointer' }}>
+                Cancelar
+              </button>
+              <button
+                onClick={resetarRanking}
+                disabled={resetandoRanking}
+                style={{ flex: 1, padding: '11px 0', borderRadius: 10, border: 'none', background: cor.erro, color: '#fff', fontFamily: 'Inter', fontWeight: 700, fontSize: 13.5, cursor: 'pointer' }}
+              >
+                {resetandoRanking ? 'Resetando…' : 'Sim, resetar ranking'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
