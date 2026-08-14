@@ -2008,6 +2008,8 @@ function AbaMembros({ membros, meuNome, adicionarMembro, removerMembro, definirF
   const [novoNome, setNovoNome] = useState('');
   const [editandoAniversario, setEditandoAniversario] = useState(null);
   const [confirmandoExclusao, setConfirmandoExclusao] = useState(null);
+  const [confirmandoReset, setConfirmandoReset] = useState(false);
+  const [resetando, setResetando] = useState(false);
   const souLider = souLiderDe(membros, meuNome);
   const podeEditarFoto = (m) => souLider || (meuNome && m.nome.trim().toLowerCase() === meuNome.trim().toLowerCase());
 
@@ -2029,6 +2031,17 @@ function AbaMembros({ membros, meuNome, adicionarMembro, removerMembro, definirF
 
   const agora = Date.now();
   const online = presenca ? Object.entries(presenca).filter(([, ts]) => agora - ts < JANELA_PRESENCA_MS).sort((a, b) => b[1] - a[1]) : [];
+
+  const resetarDados = async () => {
+    setResetando(true);
+    try {
+      const { keys } = await window.storage.list('', true);
+      await Promise.allSettled(keys.map((k) => window.storage.delete(k, true)));
+    } catch { /* alguma chave pode falhar, tenta seguir */ }
+    setResetando(false);
+    setConfirmandoReset(false);
+    window.location.reload();
+  };
 
   const [respostasHoje, setRespostasHoje] = useState(null);
   const [carregandoResumo, setCarregandoResumo] = useState(false);
@@ -2190,6 +2203,47 @@ function AbaMembros({ membros, meuNome, adicionarMembro, removerMembro, definirF
               )}
             </div>
           ))}
+        </div>
+      )}
+
+      {souLider && (
+        <div style={{ marginTop: 28, paddingTop: 18, borderTop: `1px solid ${cor.borda}` }}>
+          <h3 style={{ fontFamily: 'Fraunces', fontWeight: 600, fontSize: 14.5, color: cor.erro, margin: '0 0 4px' }}>Zona de perigo</h3>
+          <p style={{ fontFamily: 'Inter', fontSize: 11.5, color: cor.mudo, margin: '0 0 10px', lineHeight: 1.5 }}>
+            Apaga membros, ranking, escalas, avisos, planejamento e respostas do quiz — deixa o app como novo, pra começar com outro grupo.
+          </p>
+          <button
+            onClick={() => setConfirmandoReset(true)}
+            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 14px', borderRadius: 10, border: `1px solid ${cor.erro}`, background: 'transparent', color: cor.erro, fontFamily: 'Inter', fontWeight: 600, fontSize: 12.5, cursor: 'pointer' }}
+          >
+            <AlertTriangle size={14} /> Resetar dados do grupo
+          </button>
+        </div>
+      )}
+
+      {confirmandoReset && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 55, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }} onClick={() => !resetando && setConfirmandoReset(false)}>
+          <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: 320, background: cor.painel, borderRadius: 18, padding: 22, textAlign: 'center' }}>
+            <div style={{ width: 44, height: 44, borderRadius: '50%', background: 'rgba(193,102,107,0.14)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}>
+              <AlertTriangle size={20} color={cor.erro} />
+            </div>
+            <p style={{ fontFamily: 'Fraunces', fontWeight: 600, fontSize: 16, color: cor.texto, margin: '0 0 6px' }}>Tem certeza que deseja resetar os dados?</p>
+            <p style={{ fontFamily: 'Inter', fontSize: 12.5, color: cor.mudo, margin: '0 0 18px', lineHeight: 1.5 }}>
+              Essa ação apaga <strong style={{ color: cor.texto }}>todos</strong> os membros, ranking, escalas, avisos, planejamento e respostas do quiz. Não tem como desfazer.
+            </p>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={() => setConfirmandoReset(false)} disabled={resetando} style={{ flex: 1, padding: '11px 0', borderRadius: 10, border: `1px solid ${cor.borda}`, background: 'transparent', color: cor.texto, fontFamily: 'Inter', fontWeight: 600, fontSize: 13.5, cursor: 'pointer' }}>
+                Cancelar
+              </button>
+              <button
+                onClick={resetarDados}
+                disabled={resetando}
+                style={{ flex: 1, padding: '11px 0', borderRadius: 10, border: 'none', background: cor.erro, color: '#fff', fontFamily: 'Inter', fontWeight: 700, fontSize: 13.5, cursor: 'pointer' }}
+              >
+                {resetando ? 'Resetando…' : 'Sim, resetar tudo'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
