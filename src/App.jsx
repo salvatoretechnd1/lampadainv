@@ -4,7 +4,7 @@ import {
   Camera, Mic, ChevronLeft, ChevronRight, Plus, Trash2, FileText,
   Sun, Moon, Share2, Cake, BellRing, ArrowLeft, Sparkles, LogOut, Gem, Award, RefreshCw,
   CalendarClock, AlertTriangle,
-  Megaphone, Clock, MapPin, Star, Pencil, Send, CheckCircle2,
+  Megaphone, Clock, MapPin, Star, Pencil, Send, CheckCircle2, ImagePlus, Download,
 } from 'lucide-react';
 
 /* ---------------------------------------------------------
@@ -459,13 +459,12 @@ function souLiderDe(membros, meuNome) {
 }
 
 // redimensiona uma imagem antes de guardar (evita fotos gigantes no storage)
-function redimensionarImagem(file) {
+function redimensionarImagem(file, max = 240, qualidade = 0.78) {
   return new Promise((resolve, reject) => {
     const leitor = new FileReader();
     leitor.onload = (e) => {
       const img = new Image();
       img.onload = () => {
-        const max = 240;
         let { width, height } = img;
         if (width > height) { if (width > max) { height = Math.round(height * (max / width)); width = max; } }
         else { if (height > max) { width = Math.round(width * (max / height)); height = max; } }
@@ -473,7 +472,7 @@ function redimensionarImagem(file) {
         canvas.width = width; canvas.height = height;
         const ctx = canvas.getContext('2d');
         ctx.drawImage(img, 0, 0, width, height);
-        resolve(canvas.toDataURL('image/jpeg', 0.78));
+        resolve(canvas.toDataURL('image/jpeg', qualidade));
       };
       img.onerror = reject;
       img.src = e.target.result;
@@ -481,6 +480,117 @@ function redimensionarImagem(file) {
     leitor.onerror = reject;
     leitor.readAsDataURL(file);
   });
+}
+
+const REACOES_DISPONIVEIS = ['❤️', '🙌', '🔥', '😂', '🙏'];
+
+// cache em memória pra não rebaixar a mesma foto duas vezes (miniatura + tela cheia)
+const cacheFotos = {};
+
+function FotoImg({ id, alt, style }) {
+  const [src, setSrc] = useState(cacheFotos[id] || null);
+  useEffect(() => {
+    if (cacheFotos[id]) { setSrc(cacheFotos[id]); return; }
+    let ativo = true;
+    (async () => {
+      try {
+        const r = await window.storage.get(`foto:${id}`, true);
+        if (r && ativo) { cacheFotos[id] = r.value; setSrc(r.value); }
+      } catch { /* falha ao carregar */ }
+    })();
+    return () => { ativo = false; };
+  }, [id]);
+  if (!src) {
+    return <div style={{ ...style, display: 'flex', alignItems: 'center', justifyContent: 'center', background: cor.painelAlt }}><Loader2 className="spin" size={14} color={cor.mudo} /></div>;
+  }
+  return <img src={src} alt={alt || ''} style={style} />;
+}
+
+function FotoEventoModal({ dId, eventoId, fotoId, dados, meuNome, souLider, onFechar, onRemover, onReagir }) {
+  const [src, setSrc] = useState(cacheFotos[fotoId] || null);
+  useEffect(() => {
+    if (cacheFotos[fotoId]) { setSrc(cacheFotos[fotoId]); return; }
+    let ativo = true;
+    (async () => {
+      try {
+        const r = await window.storage.get(`foto:${fotoId}`, true);
+        if (r && ativo) { cacheFotos[fotoId] = r.value; setSrc(r.value); }
+      } catch { /* falha ao carregar */ }
+    })();
+    return () => { ativo = false; };
+  }, [fotoId]);
+
+  const evento = (dados[dId] || []).find((e) => e.id === eventoId);
+  const foto = evento?.fotos?.find((f) => f.id === fotoId);
+  if (!foto) return null;
+  const reacoes = foto.reacoes || {};
+  const minhaReacao = meuNome ? reacoes[meuNome] : null;
+  const contagem = {};
+  Object.values(reacoes).forEach((em) => { contagem[em] = (contagem[em] || 0) + 1; });
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 65, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 20 }} onClick={onFechar}>
+      <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: 380 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+          <span style={{ fontFamily: 'Inter', fontSize: 12.5, color: '#fff' }}>Foto de {foto.autor}</span>
+          <div style={{ display: 'flex', gap: 14 }}>
+            {src && (
+              <a href={src} download={`lampada-${dId}.jpg`} title="Baixar foto" style={{ display: 'flex' }}>
+                <Download size={17} color="#fff" />
+              </a>
+            )}
+            {(foto.autor === meuNome || souLider) && (
+              <button onClick={() => onRemover(fotoId)} style={{ background: 'transparent', border: 'none', cursor: 'pointer' }}>
+                <Trash2 size={17} color="#fff" />
+              </button>
+            )}
+            <button onClick={onFechar} style={{ background: 'transparent', border: 'none', cursor: 'pointer' }}>
+              <X size={19} color="#fff" />
+            </button>
+          </div>
+        </div>
+
+        {src ? (
+          <img src={src} alt="" style={{ width: '100%', borderRadius: 14, display: 'block', maxHeight: '60vh', objectFit: 'contain', background: '#000' }} />
+        ) : (
+          <div style={{ width: '100%', height: 260, borderRadius: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#000' }}>
+            <Loader2 className="spin" size={22} color={cor.ouro} />
+          </div>
+        )}
+
+        {Object.keys(contagem).length > 0 && (
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 10 }}>
+            {Object.entries(contagem).map(([emoji, qtd]) => (
+              <span key={emoji} style={{ background: 'rgba(255,255,255,0.1)', borderRadius: 999, padding: '4px 9px', fontSize: 13, color: '#fff', fontFamily: 'Inter' }}>
+                {emoji} {qtd}
+              </span>
+            ))}
+          </div>
+        )}
+
+        <p style={{ fontFamily: 'Inter', fontSize: 10.5, color: 'rgba(255,255,255,0.5)', margin: '8px 0 0' }}>
+          No iPhone, se o botão de baixar não funcionar, mantenha o dedo pressionado na foto e toque em "Salvar imagem".
+        </p>
+
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginTop: 16 }}>
+          {REACOES_DISPONIVEIS.map((emoji) => (
+            <button
+              key={emoji}
+              onClick={() => onReagir(fotoId, emoji)}
+              style={{
+                width: 42, height: 42, borderRadius: '50%', fontSize: 20, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                border: `1.5px solid ${minhaReacao === emoji ? cor.ouro : 'rgba(255,255,255,0.2)'}`,
+                background: minhaReacao === emoji ? 'rgba(227,178,60,0.22)' : 'rgba(255,255,255,0.06)',
+                cursor: 'pointer',
+              }}
+            >
+              {emoji}
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 const DURACAO_MAX_AUDIO = 240; // segundos (4 minutos)
@@ -1278,6 +1388,9 @@ function AbaAvisos({ membros, meuNome }) {
   const [editandoId, setEditandoId] = useState(null);
   const [salvando, setSalvando] = useState(false);
   const [verConfirmados, setVerConfirmados] = useState(null);
+  const [enviandoFotoId, setEnviandoFotoId] = useState(null);
+  const [fotoAmpliada, setFotoAmpliada] = useState(null);
+  const [visao, setVisao] = useState('calendario');
 
   const souLider = souLiderDe(membros, meuNome);
   const mid = `${ano}-${pad(mes + 1)}`;
@@ -1350,12 +1463,19 @@ function AbaAvisos({ membros, meuNome }) {
   };
 
   const remover = async (dId, eventoId) => {
+    const alvo = (dados[dId] || []).find((e) => e.id === eventoId);
     const restantes = (dados[dId] || []).filter((e) => e.id !== eventoId);
     const novo = { ...dados };
     if (restantes.length > 0) novo[dId] = restantes; else delete novo[dId];
     setDados(novo);
     if (editandoId === eventoId) limparFormulario();
-    try { await window.storage.set(`avisos:${mid}`, JSON.stringify(novo), true); } catch { /* tenta depois */ }
+    try {
+      await window.storage.set(`avisos:${mid}`, JSON.stringify(novo), true);
+      if (alvo?.fotos?.length) {
+        await Promise.allSettled(alvo.fotos.map((f) => window.storage.delete(`foto:${f.id}`, true)));
+        alvo.fotos.forEach((f) => { delete cacheFotos[f.id]; });
+      }
+    } catch { /* tenta depois */ }
   };
 
   const alternarDestaque = async (dId, eventoId) => {
@@ -1373,6 +1493,54 @@ function AbaAvisos({ membros, meuNome }) {
       if (confirmacoes[meuNome] === status) delete confirmacoes[meuNome];
       else confirmacoes[meuNome] = status;
       return { ...e, confirmacoes };
+    });
+    const novo = { ...dados, [dId]: atualizada };
+    setDados(novo);
+    try { await window.storage.set(`avisos:${mid}`, JSON.stringify(novo), true); } catch { /* tenta depois */ }
+  };
+
+  const enviarFoto = async (dId, eventoId, file) => {
+    if (!file || !meuNome) return;
+    setEnviandoFotoId(eventoId);
+    try {
+      const imagem = await redimensionarImagem(file, 1000, 0.8);
+      const fotoId = gerarId();
+      await window.storage.set(`foto:${fotoId}`, imagem, true);
+      cacheFotos[fotoId] = imagem;
+      const novaFoto = { id: fotoId, autor: meuNome, ts: Date.now(), reacoes: {} };
+      const atualizada = (dados[dId] || []).map((e) => (e.id === eventoId ? { ...e, fotos: [...(e.fotos || []), novaFoto] } : e));
+      const novo = { ...dados, [dId]: atualizada };
+      setDados(novo);
+      await window.storage.set(`avisos:${mid}`, JSON.stringify(novo), true);
+    } catch { /* tenta depois */ }
+    setEnviandoFotoId(null);
+  };
+
+  const removerFoto = async (dId, eventoId, fotoId) => {
+    const atualizada = (dados[dId] || []).map((e) => (
+      e.id === eventoId ? { ...e, fotos: (e.fotos || []).filter((f) => f.id !== fotoId) } : e
+    ));
+    const novo = { ...dados, [dId]: atualizada };
+    setDados(novo);
+    setFotoAmpliada(null);
+    try {
+      await window.storage.set(`avisos:${mid}`, JSON.stringify(novo), true);
+      await window.storage.delete(`foto:${fotoId}`, true);
+      delete cacheFotos[fotoId];
+    } catch { /* tenta depois */ }
+  };
+
+  const reagirFoto = async (dId, eventoId, fotoId, emoji) => {
+    if (!meuNome) return;
+    const atualizada = (dados[dId] || []).map((e) => {
+      if (e.id !== eventoId) return e;
+      const fotos = (e.fotos || []).map((f) => {
+        if (f.id !== fotoId) return f;
+        const reacoes = { ...(f.reacoes || {}) };
+        if (reacoes[meuNome] === emoji) delete reacoes[meuNome]; else reacoes[meuNome] = emoji;
+        return { ...f, reacoes };
+      });
+      return { ...e, fotos };
     });
     const novo = { ...dados, [dId]: atualizada };
     setDados(novo);
@@ -1404,10 +1572,27 @@ function AbaAvisos({ membros, meuNome }) {
   return (
     <div style={{ padding: '4px 18px 100px' }}>
       <h2 style={{ fontFamily: 'Fraunces', fontWeight: 600, fontSize: 21, color: cor.texto, margin: '14px 0 4px' }}>Avisos e eventos</h2>
-      <p style={{ fontFamily: 'Inter', fontSize: 13, color: cor.mudo, margin: '0 0 16px' }}>
+      <p style={{ fontFamily: 'Inter', fontSize: 13, color: cor.mudo, margin: '0 0 14px' }}>
         {souLider ? 'Toque num dia pra marcar um culto, evento ou aviso.' : 'Confira os próximos cultos e eventos do grupo.'}
       </p>
 
+      <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+        <button
+          onClick={() => setVisao('calendario')}
+          style={{ flex: 1, padding: '9px 0', borderRadius: 10, border: `1px solid ${visao === 'calendario' ? cor.ouro : cor.borda}`, background: visao === 'calendario' ? 'rgba(227,178,60,0.12)' : 'transparent', color: visao === 'calendario' ? cor.ouro : cor.mudo, fontFamily: 'Inter', fontWeight: 700, fontSize: 12.5, cursor: 'pointer' }}
+        >
+          📅 Calendário
+        </button>
+        <button
+          onClick={() => setVisao('galeria')}
+          style={{ flex: 1, padding: '9px 0', borderRadius: 10, border: `1px solid ${visao === 'galeria' ? cor.ouro : cor.borda}`, background: visao === 'galeria' ? 'rgba(227,178,60,0.12)' : 'transparent', color: visao === 'galeria' ? cor.ouro : cor.mudo, fontFamily: 'Inter', fontWeight: 700, fontSize: 12.5, cursor: 'pointer' }}
+        >
+          📸 Galeria
+        </button>
+      </div>
+
+      {visao === 'calendario' && (
+      <>
       <div style={{ background: cor.painel, border: `1px solid ${cor.borda}`, borderRadius: 16, padding: 14 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
           <button onClick={() => mudarMes(-1)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 6 }}>
@@ -1569,6 +1754,41 @@ function AbaAvisos({ membros, meuNome }) {
                         )}
                       </div>
                     )}
+
+                    {((e.fotos && e.fotos.length > 0) || souLider) && (
+                    <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingTop: 4 }}>
+                      {(e.fotos || []).map((f) => {
+                        const totalReacoes = Object.keys(f.reacoes || {}).length;
+                        return (
+                          <button
+                            key={f.id}
+                            onClick={() => setFotoAmpliada({ dId, eventoId: e.id, fotoId: f.id })}
+                            style={{ position: 'relative', flexShrink: 0, width: 64, height: 64, borderRadius: 10, overflow: 'hidden', border: `1px solid ${cor.borda}`, padding: 0, cursor: 'pointer' }}
+                          >
+                            <FotoImg id={f.id} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                            {totalReacoes > 0 && (
+                              <span style={{ position: 'absolute', bottom: 2, right: 2, background: 'rgba(22,27,51,0.85)', borderRadius: 999, padding: '1px 5px', fontSize: 9.5, color: cor.texto, fontFamily: 'Inter', fontWeight: 700 }}>
+                                {totalReacoes}
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })}
+                      {souLider && (
+                        <label style={{ flexShrink: 0, width: 64, height: 64, borderRadius: 10, border: `1.5px dashed ${cor.borda}`, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+                          {enviandoFotoId === e.id ? (
+                            <Loader2 className="spin" size={16} color={cor.ouro} />
+                          ) : (
+                            <ImagePlus size={17} color={cor.mudo} />
+                          )}
+                          <input
+                            type="file" accept="image/*" style={{ display: 'none' }}
+                            onChange={(ev) => { if (ev.target.files[0]) enviarFoto(dId, e.id, ev.target.files[0]); ev.target.value = ''; }}
+                          />
+                        </label>
+                      )}
+                    </div>
+                    )}
                   </div>
                 );
               })}
@@ -1683,6 +1903,72 @@ function AbaAvisos({ membros, meuNome }) {
             ))}
           </div>
         </div>
+      )}
+      </>
+      )}
+
+      {visao === 'galeria' && (() => {
+        const eventosComFoto = agenda
+          .filter((e) => e.data <= hojeId && (e.fotos || []).length > 0)
+          .sort((a, b) => b.data.localeCompare(a.data));
+        return (
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+              <button onClick={() => mudarMes(-1)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 6 }}>
+                <ChevronLeft size={18} color={cor.mudo} />
+              </button>
+              <span style={{ fontFamily: 'Fraunces', fontWeight: 600, fontSize: 15, color: cor.texto }}>{MESES[mes]} {ano}</span>
+              <button onClick={() => mudarMes(1)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 6 }}>
+                <ChevronRight size={18} color={cor.mudo} />
+              </button>
+            </div>
+            {eventosComFoto.length === 0 ? (
+              <p style={{ fontFamily: 'Inter', fontSize: 13, color: cor.mudo, textAlign: 'center', padding: '30px 10px' }}>
+                Nenhuma foto publicada em {MESES[mes].toLowerCase()} ainda.
+              </p>
+            ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            {eventosComFoto.map((e) => {
+              const [a, m, d] = e.data.split('-').map(Number);
+              const diaSemana = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'][new Date(a, m - 1, d).getDay()];
+              return (
+                <div key={e.id} style={{ background: cor.painel, border: `1px solid ${cor.borda}`, borderRadius: 14, padding: '12px 14px' }}>
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 8 }}>
+                    <span style={{ fontFamily: 'Fraunces', fontWeight: 600, fontSize: 14.5, color: cor.texto }}>{e.titulo}</span>
+                    <span style={{ fontFamily: 'Inter', fontSize: 11, color: cor.mudo }}>{pad(d)}/{pad(m)} · {diaSemana}</span>
+                  </div>
+                  <div style={{ display: 'flex', gap: 6, overflowX: 'auto' }}>
+                    {e.fotos.map((f) => (
+                      <button
+                        key={f.id}
+                        onClick={() => setFotoAmpliada({ dId: e.data, eventoId: e.id, fotoId: f.id })}
+                        style={{ flexShrink: 0, width: 78, height: 78, borderRadius: 10, overflow: 'hidden', border: `1px solid ${cor.borda}`, padding: 0, cursor: 'pointer' }}
+                      >
+                        <FotoImg id={f.id} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+            </div>
+            )}
+          </div>
+        );
+      })()}
+
+      {fotoAmpliada && (
+        <FotoEventoModal
+          dId={fotoAmpliada.dId}
+          eventoId={fotoAmpliada.eventoId}
+          fotoId={fotoAmpliada.fotoId}
+          dados={dados}
+          meuNome={meuNome}
+          souLider={souLider}
+          onFechar={() => setFotoAmpliada(null)}
+          onRemover={(fotoId) => removerFoto(fotoAmpliada.dId, fotoAmpliada.eventoId, fotoId)}
+          onReagir={(fotoId, emoji) => reagirFoto(fotoAmpliada.dId, fotoAmpliada.eventoId, fotoId, emoji)}
+        />
       )}
     </div>
   );
