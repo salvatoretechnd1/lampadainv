@@ -392,6 +392,129 @@ function contarSequencia(semana) {
 const MESES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
 const DIAS_UTEIS = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex'];
 
+/* ---------------------------------------------------------
+   EMBLEMAS (vencedores do dia / semana / mês)
+--------------------------------------------------------- */
+const EMBLEMAS_INFO = {
+  dia: { label: 'Vencedor do Dia', Icone: Flame },
+  semana: { label: 'Vencedor da Semana', Icone: Trophy },
+  mes: { label: 'Vencedor do Mês', Icone: Crown },
+};
+
+// dado um mapa { nome: pontos }, retorna todos os nomes empatados no topo
+// (empate = todos ganham o emblema)
+function vencedoresDoMapa(mapa) {
+  const entradas = Object.entries(mapa || {}).filter(([, pts]) => pts > 0);
+  if (entradas.length === 0) return [];
+  const max = Math.max(...entradas.map(([, pts]) => pts));
+  return entradas.filter(([, pts]) => pts === max).map(([nome]) => nome);
+}
+
+// adiciona um emblema pro nome, evitando duplicar o mesmo tipo+período
+async function concederEmblema(nome, tipo, periodo) {
+  const chave = `emblemas:${nome}`;
+  let lista = [];
+  try {
+    const r = await window.storage.get(chave, true);
+    if (r && r.value) lista = JSON.parse(r.value);
+  } catch { /* ninguém tem emblema ainda */ }
+  if (lista.some((e) => e.tipo === tipo && e.periodo === periodo)) return;
+  lista.push({ tipo, periodo, data: dateId(new Date()) });
+  try {
+    await window.storage.set(chave, JSON.stringify(lista), true);
+  } catch { /* se falhar, tenta de novo numa próxima sessão */ }
+}
+
+// roda uma vez por sessão: percebe se um dia/semana/mês "virou" desde a
+// última vez que alguém abriu o app e, se sim, premia quem venceu o
+// período que terminou — sem precisar de servidor rodando em segundo plano
+async function apurarEConcederEmblemas() {
+  try {
+    const hoje = new Date();
+    const did = dateId(hoje), wid = weekId(hoje), mid = monthId(hoje);
+
+    let marcador = null;
+    try {
+      const r = await window.storage.get('emblemas-marcador', true);
+      if (r && r.value) marcador = JSON.parse(r.value);
+    } catch { /* primeira vez rodando essa lógica */ }
+
+    if (!marcador) {
+      // sem marcador ainda: só começa a contar a partir de agora, sem
+      // premiar retroativamente períodos que já passaram
+      await window.storage.set('emblemas-marcador', JSON.stringify({ dia: did, semana: wid, mes: mid }), true);
+      return;
+    }
+
+    const proximoMarcador = { ...marcador };
+
+    if (marcador.dia !== did) {
+      try {
+        const r = await window.storage.get(`respostas:${marcador.dia}`, true);
+        if (r && r.value) {
+          const obj = JSON.parse(r.value);
+          const mapaPontos = {};
+          Object.entries(obj).forEach(([k, v]) => { mapaPontos[k] = v.score; });
+          await Promise.all(vencedoresDoMapa(mapaPontos).map((n) => concederEmblema(n, 'dia', marcador.dia)));
+        }
+      } catch { /* sem respostas nesse dia */ }
+      proximoMarcador.dia = did;
+    }
+
+    if (marcador.semana !== wid) {
+      try {
+        const r = await window.storage.get(`semana:${marcador.semana}`, true);
+        if (r && r.value) {
+          const dados = JSON.parse(r.value);
+          await Promise.all(vencedoresDoMapa(dados.pontos).map((n) => concederEmblema(n, 'semana', marcador.semana)));
+        }
+      } catch { /* sem dados dessa semana */ }
+      proximoMarcador.semana = wid;
+    }
+
+    if (marcador.mes !== mid) {
+      try {
+        const r = await window.storage.get(`mes:${marcador.mes}`, true);
+        if (r && r.value) {
+          const mapa = JSON.parse(r.value);
+          await Promise.all(vencedoresDoMapa(mapa).map((n) => concederEmblema(n, 'mes', marcador.mes)));
+        }
+      } catch { /* sem dados desse mês */ }
+      proximoMarcador.mes = mid;
+    }
+
+    await window.storage.set('emblemas-marcador', JSON.stringify(proximoMarcador), true);
+  } catch {
+    // qualquer falha aqui não deve travar o app — tenta de novo na próxima sessão
+  }
+}
+
+// mostra um contador pequeno (ícone + total) do lado do nome de alguém
+function ContadorEmblemas({ nome, tamanho = 11, Icone = Award }) {
+  const [total, setTotal] = useState(null);
+  useEffect(() => {
+    let ativo = true;
+    (async () => {
+      try {
+        const r = await window.storage.get(`emblemas:${nome}`, true);
+        const lista = r && r.value ? JSON.parse(r.value) : [];
+        if (ativo) setTotal(lista.length);
+      } catch {
+        if (ativo) setTotal(0);
+      }
+    })();
+    return () => { ativo = false; };
+  }, [nome]);
+
+  if (!total) return null;
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+      <Icone size={tamanho} color={cor.ouro} />
+      <span style={{ fontFamily: 'JetBrains Mono', fontSize: tamanho - 1, fontWeight: 700, color: cor.ouro }}>{total}</span>
+    </div>
+  );
+}
+
 // embaralhamento determinístico (mesma semente = mesma ordem) — assim todo
 // mundo vê o mesmo quiz no mesmo dia, mas o conjunto muda bastante de um dia pro outro
 function embaralharComSemente(lista, semente) {
@@ -2555,8 +2678,9 @@ function AbaMembros({ membros, meuNome, adicionarMembro, removerMembro, definirF
                   onChange={(e) => { if (e.target.files[0]) definirFoto(m.id, e.target.files[0]); e.target.value = ''; }}
                 />
               )}
-              <button onClick={() => onAbrirPerfil(m)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 0 }}>
+              <button onClick={() => onAbrirPerfil(m)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
                 <span style={{ fontFamily: 'Inter', fontSize: 12, fontWeight: 600, color: cor.texto, textAlign: 'center', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 84, display: 'block' }}>{m.nome}</span>
+                <ContadorEmblemas nome={m.nome} />
               </button>
 
               {souLider ? (
@@ -3161,7 +3285,10 @@ function LinhaRanking({ posicao, nome, pontos, sufixo, membro, onAbrirPerfil }) 
         <span style={{ fontFamily: 'JetBrains Mono', fontSize: 12.5, color: cor.mudo, fontWeight: 700 }}>{posicao}</span>
       </div>
       <Avatar nome={nome} foto={membro?.foto} tamanho={34} />
-      <span style={{ flex: 1, fontFamily: 'Inter', fontSize: 14, color: cor.texto, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{nome}</span>
+      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
+        <span style={{ fontFamily: 'Inter', fontSize: 14, color: cor.texto, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{nome}</span>
+        <ContadorEmblemas nome={nome} Icone={Star} tamanho={10.5} />
+      </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: cor.painelAlt, borderRadius: 999, padding: '5px 10px', flexShrink: 0 }}>
         <Gem size={12} color={cor.ouro} />
         <span style={{ fontFamily: 'JetBrains Mono', fontSize: 12.5, color: cor.texto, fontWeight: 700 }}>{pontos}{sufixo}</span>
@@ -3337,6 +3464,7 @@ function PerfilMembro({ membro, onFechar }) {
   const [pontosMes, setPontosMes] = useState(0);
   const [diasEscalados, setDiasEscalados] = useState(0);
   const [sequencia, setSequencia] = useState(0);
+  const [emblemas, setEmblemas] = useState([]);
 
   useEffect(() => {
     (async () => {
@@ -3344,10 +3472,11 @@ function PerfilMembro({ membro, onFechar }) {
       const hoje = new Date();
       const mid = monthId(hoje);
       const wid = weekId(hoje);
-      const [rMes, rEscala, rSemana] = await Promise.allSettled([
+      const [rMes, rEscala, rSemana, rEmblemas] = await Promise.allSettled([
         window.storage.get(`mes:${mid}`, true),
         window.storage.get(`escala:${mid}`, true),
         window.storage.get(`semana:${wid}`, true),
+        window.storage.get(`emblemas:${membro.nome}`, true),
       ]);
       setPontosMes(rMes.status === 'fulfilled' && rMes.value ? (JSON.parse(rMes.value.value)[membro.nome] || 0) : 0);
       setDiasEscalados(
@@ -3360,9 +3489,12 @@ function PerfilMembro({ membro, onFechar }) {
           ? contarSequencia(JSON.parse(rSemana.value.value).trilha?.[membro.nome] || {})
           : 0
       );
+      setEmblemas(rEmblemas.status === 'fulfilled' && rEmblemas.value ? JSON.parse(rEmblemas.value.value) : []);
       setCarregando(false);
     })();
   }, [membro.id, membro.nome]);
+
+  const contagemEmblemas = emblemas.reduce((acc, e) => { acc[e.tipo] = (acc[e.tipo] || 0) + 1; return acc; }, {});
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 50, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }} onClick={onFechar}>
@@ -3392,11 +3524,41 @@ function PerfilMembro({ membro, onFechar }) {
         {carregando ? (
           <div style={{ display: 'flex', justifyContent: 'center', padding: 30 }}><Loader2 className="spin" size={20} color={cor.ouro} /></div>
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
-            <EstatCard valor={pontosMes} label="pontos no mês" />
-            <EstatCard valor={sequencia} label="dias seguidos" />
-            <EstatCard valor={diasEscalados} label="devocionais este mês" />
-          </div>
+          <>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
+              <EstatCard valor={pontosMes} label="pontos no mês" />
+              <EstatCard valor={sequencia} label="dias seguidos" />
+              <EstatCard valor={diasEscalados} label="devocionais este mês" />
+            </div>
+
+            <div style={{ marginTop: 22 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
+                <Award size={13} color={cor.mudo} />
+                <span style={{ fontFamily: 'Inter', fontSize: 11, fontWeight: 700, color: cor.mudo, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                  Emblemas{emblemas.length > 0 ? ` · ${emblemas.length}` : ''}
+                </span>
+              </div>
+
+              {emblemas.length === 0 ? (
+                <p style={{ fontFamily: 'Inter', fontSize: 12.5, color: cor.mudo, margin: 0 }}>Ainda sem emblemas — capriche no próximo quiz!</p>
+              ) : (
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  {Object.entries(EMBLEMAS_INFO).map(([tipo, info]) => {
+                    const n = contagemEmblemas[tipo] || 0;
+                    if (n === 0) return null;
+                    const Icone = info.Icone;
+                    return (
+                      <div key={tipo} title={info.label} style={{ display: 'flex', alignItems: 'center', gap: 6, background: cor.painelAlt, borderRadius: 12, padding: '8px 12px' }}>
+                        <Icone size={15} color={cor.ouro} />
+                        <span style={{ fontFamily: 'Inter', fontSize: 12, color: cor.texto, fontWeight: 600 }}>{info.label}</span>
+                        <span style={{ fontFamily: 'JetBrains Mono', fontSize: 12, color: cor.ouro, fontWeight: 700 }}>×{n}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </>
         )}
       </div>
     </div>
@@ -3452,6 +3614,9 @@ export default function App() {
       setMembrosBase(rMembros.status === 'fulfilled' && rMembros.value ? JSON.parse(rMembros.value.value) : []);
       setFotos(rFotos.status === 'fulfilled' && rFotos.value ? JSON.parse(rFotos.value.value) : {});
     })();
+    // verifica se algum dia/semana/mês "virou" desde a última vez que
+    // o app foi aberto e, se sim, premia quem venceu o período anterior
+    apurarEConcederEmblemas();
   }, []);
 
   const membros = membrosBase.map((m) => ({ ...m, foto: fotos[m.id] }));
