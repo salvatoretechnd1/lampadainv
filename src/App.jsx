@@ -814,6 +814,10 @@ body { margin: 0; }
 @keyframes confete-cair { 0% { transform: translateY(-10px) rotate(0deg); opacity: 1; } 100% { transform: translateY(100vh) rotate(600deg); opacity: 0; } }
 @keyframes orbita-surgir { from { opacity: 0; } to { opacity: 1; } }
 .orbita-fade { animation: orbita-girar 50s linear infinite, orbita-surgir 0.6s ease; }
+@keyframes medalha-girar { to { transform: rotate(360deg); } }
+.medalha-brilho { animation: medalha-girar 6s linear infinite; }
+@keyframes medalha-entrar { 0% { transform: scale(0) rotate(-25deg); opacity: 0; } 60% { transform: scale(1.12) rotate(6deg); opacity: 1; } 100% { transform: scale(1) rotate(0deg); opacity: 1; } }
+@keyframes conquista-fundo-surge { from { opacity: 0; } to { opacity: 1; } }
 `;
 
 /* ---------------------------------------------------------
@@ -861,7 +865,7 @@ function Confete() {
     largura: 6 + Math.random() * 6,
   })), []);
   return (
-    <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', overflow: 'hidden', zIndex: 70 }}>
+    <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', overflow: 'hidden', zIndex: 95 }}>
       {pecas.map((p) => (
         <span key={p.id} style={{
           position: 'absolute', top: -20, left: `${p.esquerda}%`, width: p.largura, height: p.largura * 0.4,
@@ -872,6 +876,75 @@ function Confete() {
     </div>
   );
 }
+
+// tela cheia de "conquista desbloqueada" — mostrada quando a pessoa acerta
+// o quiz inteiro. Medalha dourada com brilho giratório, confete caindo, e
+// um card de compartilhamento no estilo "figurinha desbloqueada".
+function TelaConquistaGabarito({ nome, total, onFechar }) {
+  const hoje = new Date();
+  const dataExtenso = `${hoje.getDate()} de ${MESES[hoje.getMonth()].toLowerCase()} de ${hoje.getFullYear()}`;
+
+  const compartilharConquista = () => {
+    compartilhar('Gabarito perfeito na Lâmpada 🔥', `🏅 ${nome} acertou todas as ${total} perguntas do quiz de hoje na Lâmpada!`);
+  };
+
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 90, display: 'flex', justifyContent: 'center',
+      background: `radial-gradient(circle at 50% 28%, ${cor.painelAlt} 0%, ${cor.bg} 65%)`,
+      animation: 'conquista-fundo-surge 0.4s ease',
+    }}>
+      <Confete />
+      <div style={{ width: '100%', maxWidth: 440, display: 'flex', flexDirection: 'column', minHeight: '100vh', padding: '20px 24px calc(28px + env(safe-area-inset-bottom))' }}>
+        <button onClick={onFechar} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 4, alignSelf: 'flex-start', display: 'flex' }}>
+          <ArrowLeft size={20} color={cor.mudo} />
+        </button>
+
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center' }}>
+          <div style={{ position: 'relative', width: 216, height: 216, marginBottom: 30 }}>
+            <div className="medalha-brilho" style={{
+              position: 'absolute', inset: 0, borderRadius: '50%',
+              background: `conic-gradient(from 0deg, ${cor.ouroSuave}, #FFF8E0, ${cor.ouro}, #8AA6D6, ${cor.ouroSuave}, #FFF8E0, ${cor.ouro})`,
+            }} />
+            <div style={{ position: 'absolute', inset: 7, borderRadius: '50%', background: cor.bg }} />
+            <div style={{
+              position: 'absolute', inset: 12, borderRadius: '50%',
+              background: `radial-gradient(circle at 35% 30%, ${cor.ouroSuave}, ${cor.ouro} 55%, #9C7420 100%)`,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              boxShadow: 'inset 0 -6px 14px rgba(0,0,0,0.25), inset 0 6px 14px rgba(255,255,255,0.35), 0 0 46px rgba(227,178,60,0.55)',
+              animation: 'medalha-entrar 0.7s cubic-bezier(0.34, 1.56, 0.64, 1)',
+            }}>
+              <Flame size={70} color="#161B33" fill="#161B33" />
+            </div>
+          </div>
+
+          <h1 style={{ fontFamily: 'Fraunces', fontWeight: 600, fontSize: 25, color: cor.texto, margin: '0 0 8px' }}>Gabarito perfeito!</h1>
+          <p style={{ fontFamily: 'Inter', fontSize: 14, color: cor.mudo, margin: '0 0 26px', lineHeight: 1.5, maxWidth: 300 }}>
+            Você acertou todas as {total} perguntas do quiz de hoje. Que exemplo pra igreja!
+          </p>
+
+          <div style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 12, background: cor.painel, border: `1px solid ${cor.borda}`, borderRadius: 16, padding: '14px 16px' }}>
+            <Avatar nome={nome} tamanho={38} />
+            <div style={{ textAlign: 'left' }}>
+              <div style={{ fontFamily: 'Inter', fontWeight: 700, fontSize: 14, color: cor.texto }}>{nome}</div>
+              <div style={{ fontFamily: 'Inter', fontSize: 12, color: cor.mudo, marginTop: 1 }}>Recebido em {dataExtenso}</div>
+            </div>
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', gap: 10 }}>
+          <button onClick={onFechar} style={{ flex: 1, padding: '13px', borderRadius: 12, border: `1.5px solid ${cor.borda}`, background: 'transparent', color: cor.texto, fontFamily: 'Inter', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>
+            Fechar
+          </button>
+          <button onClick={compartilharConquista} style={{ flex: 1.4, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '13px', borderRadius: 12, border: 'none', background: cor.ouro, color: '#161B33', fontFamily: 'Inter', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>
+            <Share2 size={15} /> Compartilhar
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 
 /* ---------------------------------------------------------
    COMPONENTE: TRILHA DE LUZ
@@ -1152,7 +1225,7 @@ function AbaQuiz({ nome }) {
   const [enviando, setEnviando] = useState(false);
   const [semana, setSemana] = useState({});
   const [erro, setErro] = useState('');
-  const [mostrarConfete, setMostrarConfete] = useState(false);
+  const [mostrarConquista, setMostrarConquista] = useState(false);
   const [avisoDestaque, setAvisoDestaque] = useState(null);
   const [travadoPorSaida, setTravadoPorSaida] = useState(false);
 
@@ -1233,8 +1306,7 @@ function AbaQuiz({ nome }) {
       const acertos = selecoes.filter((s, i) => s === perguntas[i].c).length;
       const registro = await salvarResultado(acertos);
       if (registro.score === registro.total) {
-        setMostrarConfete(true);
-        setTimeout(() => setMostrarConfete(false), 2600);
+        setMostrarConquista(true);
       }
     } catch (e) {
       setErro('Não foi possível enviar agora. Tenta de novo em instantes.');
@@ -1295,18 +1367,8 @@ function AbaQuiz({ nome }) {
           </div>
         </div>
       )}
-      {mostrarConfete && <Confete />}
-      {mostrarConfete && (
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: 10, background: `linear-gradient(135deg, rgba(227,178,60,0.18), rgba(240,200,104,0.10))`,
-          border: `1.5px solid ${cor.ouro}`, borderRadius: 14, padding: '14px 16px', marginBottom: 10,
-        }}>
-          <span style={{ fontSize: 22 }}>🎉</span>
-          <div>
-            <div style={{ fontFamily: 'Fraunces', fontWeight: 600, fontSize: 15, color: cor.texto }}>Pontuação perfeita!</div>
-            <div style={{ fontFamily: 'JetBrains Mono', fontWeight: 700, fontSize: 13, color: cor.ouro }}>{respostasHoje.score}/{respostasHoje.total} acertos</div>
-          </div>
-        </div>
+      {mostrarConquista && (
+        <TelaConquistaGabarito nome={nome} total={respostasHoje?.total || perguntas.length} onFechar={() => setMostrarConquista(false)} />
       )}
       <div style={{ background: cor.painelAlt, border: `1px solid ${cor.borda}`, borderRadius: 14, padding: '14px 16px', marginBottom: 6 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
