@@ -425,6 +425,40 @@ async function concederEmblema(nome, tipo, periodo) {
   } catch { /* se falhar, tenta de novo numa próxima sessão */ }
 }
 
+// marcos de dias seguidos que valem emblema
+const SEQUENCIA_MARCOS = [3, 7, 14, 30, 60, 100];
+
+// chamado toda vez que alguém completa o quiz do dia: atualiza a
+// sequência (streak) persistente da pessoa e premia marcos alcançados.
+// guardado de forma independente da "trilha" semanal (que é só visual),
+// então a sequência não quebra sozinha ao virar a semana.
+async function atualizarSequenciaEEmblemas(nome) {
+  const hoje = new Date();
+  const did = dateId(hoje);
+  const ontemId = dateId(new Date(hoje.getTime() - 86400000));
+
+  let dados = { atual: 0, ultimoDia: null };
+  try {
+    const r = await window.storage.get(`streak:${nome}`, true);
+    if (r && r.value) dados = JSON.parse(r.value);
+  } catch { /* primeira vez dessa pessoa */ }
+
+  if (dados.ultimoDia === did) return dados.atual; // já contabilizado hoje
+
+  dados.atual = dados.ultimoDia === ontemId ? dados.atual + 1 : 1;
+  dados.ultimoDia = did;
+
+  try {
+    await window.storage.set(`streak:${nome}`, JSON.stringify(dados), true);
+  } catch { /* se falhar, tenta de novo na próxima resposta */ }
+
+  await Promise.all(
+    SEQUENCIA_MARCOS.filter((marco) => marco === dados.atual).map((marco) => concederEmblema(nome, 'sequencia', String(marco)))
+  );
+
+  return dados.atual;
+}
+
 // roda uma vez por sessão: percebe se um dia/semana/mês "virou" desde a
 // última vez que alguém abriu o app e, se sim, premia quem venceu o
 // período que terminou — sem precisar de servidor rodando em segundo plano
@@ -1182,6 +1216,9 @@ function AbaQuiz({ nome }) {
       window.storage.set(`semana:${wid}`, JSON.stringify(dadosSemana), true),
       window.storage.set(`mes:${mid}`, JSON.stringify(rankMes), true),
     ]);
+
+    // atualiza a sequência de dias seguidos e premia marcos (7, 30 dias...)
+    atualizarSequenciaEEmblemas(nome);
 
     setSemana(dadosSemana.trilha[nome]);
     setRespostasHoje(registro);
@@ -3471,12 +3508,13 @@ function PerfilMembro({ membro, onFechar }) {
       setCarregando(true);
       const hoje = new Date();
       const mid = monthId(hoje);
-      const wid = weekId(hoje);
-      const [rMes, rEscala, rSemana, rEmblemas] = await Promise.allSettled([
+      const did = dateId(hoje);
+      const ontemId = dateId(new Date(hoje.getTime() - 86400000));
+      const [rMes, rEscala, rEmblemas, rStreak] = await Promise.allSettled([
         window.storage.get(`mes:${mid}`, true),
         window.storage.get(`escala:${mid}`, true),
-        window.storage.get(`semana:${wid}`, true),
         window.storage.get(`emblemas:${membro.nome}`, true),
+        window.storage.get(`streak:${membro.nome}`, true),
       ]);
       setPontosMes(rMes.status === 'fulfilled' && rMes.value ? (JSON.parse(rMes.value.value)[membro.nome] || 0) : 0);
       setDiasEscalados(
@@ -3484,11 +3522,14 @@ function PerfilMembro({ membro, onFechar }) {
           ? Object.values(JSON.parse(rEscala.value.value)).filter((v) => v.membroId === membro.id).length
           : 0
       );
-      setSequencia(
-        rSemana.status === 'fulfilled' && rSemana.value
-          ? contarSequencia(JSON.parse(rSemana.value.value).trilha?.[membro.nome] || {})
-          : 0
-      );
+      // sequência persistente (não zera ao virar a semana) — só conta
+      // como "ativa" se a pessoa respondeu hoje ou ontem
+      if (rStreak.status === 'fulfilled' && rStreak.value) {
+        const d = JSON.parse(rStreak.value.value);
+        setSequencia(d.ultimoDia === did || d.ultimoDia === ontemId ? d.atual : 0);
+      } else {
+        setSequencia(0);
+      }
       setEmblemas(rEmblemas.status === 'fulfilled' && rEmblemas.value ? JSON.parse(rEmblemas.value.value) : []);
       setCarregando(false);
     })();
@@ -3555,6 +3596,12 @@ function PerfilMembro({ membro, onFechar }) {
                       </div>
                     );
                   })}
+                  {SEQUENCIA_MARCOS.filter((marco) => emblemas.some((e) => e.tipo === 'sequencia' && e.periodo === String(marco))).map((marco) => (
+                    <div key={`seq-${marco}`} title={`Sequência de ${marco} dias`} style={{ display: 'flex', alignItems: 'center', gap: 6, background: cor.painelAlt, borderRadius: 12, padding: '8px 12px' }}>
+                      <Sparkles size={15} color={cor.ouro} />
+                      <span style={{ fontFamily: 'Inter', fontSize: 12, color: cor.texto, fontWeight: 600 }}>{marco} dias seguidos</span>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
@@ -3636,6 +3683,44 @@ export default function App() {
     };
     atualizarPresenca();
     const intervalo = setInterval(atualizarPresenca, 30000);
+    return () => clearInterval(intervalo);
+  }, [nome]);
+
+  // lembrete diário do quiz (19h-21h), via Notification do navegador — só
+  // funciona enquanto o app está aberto (em primeiro ou segundo plano);
+  // pra notificar de verdade com o app fechado, precisaria de push real
+  // (service worker + servidor), que é passo futuro pra Play Store
+  useEffect(() => {
+    if (!nome) return;
+    if (typeof Notification === 'undefined') return;
+    if (Notification.permission === 'default') Notification.requestPermission();
+
+    const verificarLembrete = async () => {
+      if (Notification.permission !== 'granted') return;
+      const agora = new Date();
+      if (agora.getHours() < 19 || agora.getHours() >= 21) return;
+
+      const did = dateId(agora);
+      try {
+        const rAvisado = await window.storage.get(`lembrete-avisado:${nome}`, false);
+        if (rAvisado && rAvisado.value === did) return; // já avisou hoje
+      } catch { /* nunca avisou ainda */ }
+
+      let jaRespondeu = false;
+      try {
+        const r = await window.storage.get(`respostas:${did}`, true);
+        if (r && r.value) jaRespondeu = !!JSON.parse(r.value)[nome];
+      } catch { /* sem respostas hoje */ }
+      if (jaRespondeu) return;
+
+      try {
+        new Notification('Lâmpada 🔥', { body: 'Seu quiz de hoje ainda te espera!' });
+        await window.storage.set(`lembrete-avisado:${nome}`, did, false);
+      } catch { /* ambiente sem suporte a notificação */ }
+    };
+
+    verificarLembrete();
+    const intervalo = setInterval(verificarLembrete, 5 * 60 * 1000);
     return () => clearInterval(intervalo);
   }, [nome]);
 
