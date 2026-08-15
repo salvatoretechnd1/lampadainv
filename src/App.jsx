@@ -508,6 +508,7 @@ function FotoImg({ id, alt, style }) {
 
 function FotoEventoModal({ dId, eventoId, fotoId, dados, meuNome, souLider, onFechar, onRemover, onReagir }) {
   const [src, setSrc] = useState(cacheFotos[fotoId] || null);
+  const [confirmandoExclusao, setConfirmandoExclusao] = useState(false);
   useEffect(() => {
     if (cacheFotos[fotoId]) { setSrc(cacheFotos[fotoId]); return; }
     let ativo = true;
@@ -540,7 +541,7 @@ function FotoEventoModal({ dId, eventoId, fotoId, dados, meuNome, souLider, onFe
               </a>
             )}
             {(foto.autor === meuNome || souLider) && (
-              <button onClick={() => onRemover(fotoId)} style={{ background: 'transparent', border: 'none', cursor: 'pointer' }}>
+              <button onClick={() => setConfirmandoExclusao(true)} style={{ background: 'transparent', border: 'none', cursor: 'pointer' }}>
                 <Trash2 size={17} color="#fff" />
               </button>
             )}
@@ -589,6 +590,28 @@ function FotoEventoModal({ dId, eventoId, fotoId, dados, meuNome, souLider, onFe
           ))}
         </div>
       </div>
+
+      {confirmandoExclusao && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 70, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }} onClick={(e) => { e.stopPropagation(); setConfirmandoExclusao(false); }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: 300, background: cor.painel, borderRadius: 16, padding: 20, textAlign: 'center' }}>
+            <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'rgba(193,102,107,0.14)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 10px' }}>
+              <AlertTriangle size={18} color={cor.erro} />
+            </div>
+            <p style={{ fontFamily: 'Fraunces', fontWeight: 600, fontSize: 15, color: cor.texto, margin: '0 0 6px' }}>Apagar essa foto?</p>
+            <p style={{ fontFamily: 'Inter', fontSize: 12, color: cor.mudo, margin: '0 0 16px', lineHeight: 1.5 }}>
+              Não tem como desfazer depois de apagada.
+            </p>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={() => setConfirmandoExclusao(false)} style={{ flex: 1, padding: '10px 0', borderRadius: 10, border: `1px solid ${cor.borda}`, background: 'transparent', color: cor.texto, fontFamily: 'Inter', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>
+                Cancelar
+              </button>
+              <button onClick={() => onRemover(fotoId)} style={{ flex: 1, padding: '10px 0', borderRadius: 10, border: 'none', background: cor.erro, color: '#fff', fontFamily: 'Inter', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>
+                Apagar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
