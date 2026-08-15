@@ -483,7 +483,7 @@ function redimensionarImagem(file) {
   });
 }
 
-const DURACAO_MAX_AUDIO = 120; // segundos
+const DURACAO_MAX_AUDIO = 240; // segundos (4 minutos)
 const JANELA_PRESENCA_MS = 3 * 60 * 1000; // considera "online" quem teve heartbeat nos últimos 3 min
 
 /* ---------------------------------------------------------
@@ -685,7 +685,8 @@ function OrbitaMembros({ membros, onSelecionar }) {
 function TelaNome({ onEntrar, membros, onCadastrarMembro }) {
   const [valor, setValor] = useState('');
   const [senha, setSenha] = useState('');
-  const [aniversario, setAniversario] = useState('');
+  const [diaNiver, setDiaNiver] = useState('');
+  const [mesNiver, setMesNiver] = useState('');
   const [modo, setModo] = useState('entrar'); // 'entrar' | 'cadastrar'
   const [processando, setProcessando] = useState(false);
   const [erro, setErro] = useState('');
@@ -718,8 +719,9 @@ function TelaNome({ onEntrar, membros, onCadastrarMembro }) {
         }
         await window.storage.set(chave, JSON.stringify({ senha }), true);
         const jaEhMembro = membros.some((m) => m.nome.trim().toLowerCase() === nomeLimpo.toLowerCase());
+        const aniversario = diaNiver && mesNiver ? `${diaNiver}/${mesNiver}` : '';
         if (!jaEhMembro && onCadastrarMembro) {
-          await onCadastrarMembro(nomeLimpo, aniversario.trim());
+          await onCadastrarMembro(nomeLimpo, aniversario);
         }
         onEntrar(nomeLimpo);
       } else {
@@ -793,17 +795,33 @@ function TelaNome({ onEntrar, membros, onCadastrarMembro }) {
         />
 
         {modo === 'cadastrar' && (
-          <input
-            value={aniversario}
-            onChange={(e) => setAniversario(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && confirmar()}
-            placeholder="Seu aniversário — DD/MM (opcional)"
-            style={{
-              width: '100%', maxWidth: 280, padding: '13px 16px', borderRadius: 12,
-              border: `1px solid ${cor.borda}`, background: cor.painel, color: cor.texto,
-              fontFamily: 'Inter', fontSize: 15, outline: 'none', marginBottom: 14,
-            }}
-          />
+          <div style={{ width: '100%', maxWidth: 280, marginBottom: 14 }}>
+            <p style={{ fontFamily: 'Inter', fontSize: 11.5, color: cor.mudo, margin: '0 0 6px' }}>Seu aniversário — dia e mês (opcional)</p>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <select
+                value={diaNiver}
+                onChange={(e) => setDiaNiver(e.target.value)}
+                style={{
+                  flex: 1, padding: '13px 10px', borderRadius: 12, border: `1px solid ${cor.borda}`, background: cor.painel,
+                  color: diaNiver ? cor.texto : cor.mudo, fontFamily: 'Inter', fontSize: 15, outline: 'none',
+                }}
+              >
+                <option value="">Dia</option>
+                {Array.from({ length: 31 }, (_, i) => pad(i + 1)).map((d) => <option key={d} value={d}>{d}</option>)}
+              </select>
+              <select
+                value={mesNiver}
+                onChange={(e) => setMesNiver(e.target.value)}
+                style={{
+                  flex: 1.4, padding: '13px 10px', borderRadius: 12, border: `1px solid ${cor.borda}`, background: cor.painel,
+                  color: mesNiver ? cor.texto : cor.mudo, fontFamily: 'Inter', fontSize: 15, outline: 'none',
+                }}
+              >
+                <option value="">Mês</option>
+                {MESES.map((m, i) => <option key={m} value={pad(i + 1)}>{m}</option>)}
+              </select>
+            </div>
+          </div>
         )}
 
         {erro && <p style={{ color: cor.erro, fontFamily: 'Inter', fontSize: 12.5, margin: '-6px 0 14px', maxWidth: 280 }}>{erro}</p>}
