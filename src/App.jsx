@@ -6,6 +6,7 @@ import {
   CalendarClock, AlertTriangle,
   Megaphone, Clock, MapPin, Star, Pencil, Send, CheckCircle2, ImagePlus, Download,
 } from 'lucide-react';
+import GooeyNav from './GooeyNav/GooeyNav';
 
 /* ---------------------------------------------------------
    BANCO DE PERGUNTAS
@@ -1050,9 +1051,9 @@ function OrbitaMembros({ membros, onSelecionar }) {
 --------------------------------------------------------- */
 function FaixaOndaInicio({ texto = 'APLICATIVO PARA OS JOVENS DA IGREJA INV RIO COMPRIDO' }) {
   const VIEW_W = 1200;
-  const VIEW_H = 170;
-  const CY = 85;
-  const d = `M -320 ${CY} Q -160 45 0 ${CY} T 320 ${CY} T 640 ${CY} T 960 ${CY} T 1280 ${CY} T ${VIEW_W + 320} ${CY}`;
+  const VIEW_H = 140;
+  const CY = VIEW_H / 2;
+  const d = `M -320 ${CY} Q -160 15 0 ${CY} T 320 ${CY} T 640 ${CY} T 960 ${CY} T 1280 ${CY} T ${VIEW_W + 320} ${CY}`;
   const pathId = 'faixa-onda-inicio-path';
   const unidade = `${texto}\u00A0✦\u00A0`;
   const loopTexto = unidade.repeat(4);
@@ -1075,9 +1076,9 @@ function FaixaOndaInicio({ texto = 'APLICATIVO PARA OS JOVENS DA IGREJA INV RIO 
   }, []);
 
   return (
-    <svg viewBox={`0 0 ${VIEW_W} ${VIEW_H}`} preserveAspectRatio="xMidYMid slice" style={{ width: '100%', height: 48, display: 'block' }}>
-      <path id={pathId} d={d} fill="none" stroke="#5227FF" strokeWidth={60} strokeLinecap="round" strokeLinejoin="round" />
-      <text fontFamily="Inter" fontWeight={800} fontSize={20} letterSpacing={1.5} fill="#ffffff" dominantBaseline="central">
+    <svg viewBox={`0 0 ${VIEW_W} ${VIEW_H}`} preserveAspectRatio="xMidYMid slice" style={{ width: '100%', height: 64, display: 'block' }}>
+      <path id={pathId} d={d} fill="none" stroke="#5227FF" strokeWidth={96} strokeLinecap="round" strokeLinejoin="round" />
+      <text fontFamily="Inter" fontWeight={800} fontSize={26} letterSpacing={2} fill="#ffffff" dominantBaseline="central">
         <textPath ref={trackRef} href={`#${pathId}`} startOffset={0}>{loopTexto}</textPath>
       </text>
     </svg>
@@ -1158,7 +1159,11 @@ function TelaNome({ onEntrar, membros, onCadastrarMembro }) {
           <span style={{ fontFamily: 'Inter', fontStyle: 'normal', fontSize: 11 }}>Salmos 119:105 · NAA</span>
         </p>
 
-        <div style={{ display: 'flex', gap: 8, width: '100%', maxWidth: 280, marginBottom: 14, marginTop: 20 }}>
+        <div style={{ width: '100%', maxWidth: 320, marginBottom: 20 }}>
+          <FaixaOndaInicio />
+        </div>
+
+        <div style={{ display: 'flex', gap: 8, width: '100%', maxWidth: 280, marginBottom: 14 }}>
           <button
             onClick={() => trocarModo('entrar')}
             style={{ flex: 1, padding: '9px 0', borderRadius: 999, border: `1.5px solid ${modo === 'entrar' ? cor.ouro : cor.borda}`, background: modo === 'entrar' ? 'rgba(227,178,60,0.10)' : 'transparent', color: cor.texto, fontFamily: 'Inter', fontWeight: 600, fontSize: 12.5, cursor: 'pointer' }}
@@ -1241,9 +1246,9 @@ function TelaNome({ onEntrar, membros, onCadastrarMembro }) {
         </button>
       </div>
 
-      <div style={{ width: '100%', maxWidth: 320, margin: '18px auto 0' }}>
-        <FaixaOndaInicio />
-      </div>
+      <p style={{ fontFamily: 'Inter', fontSize: 12, color: cor.mudo, margin: '18px 0 0', lineHeight: 1.5 }}>
+        App criado para os jovens da Igreja de Nova Vida do Rio Comprido
+      </p>
     </div>
   );
 }
@@ -4000,26 +4005,23 @@ export default function App() {
               {aba === 'ranking' && <AbaRanking membros={membros} onAbrirPerfil={setPerfilAberto} />}
             </div>
 
-            <div style={{ position: 'sticky', bottom: 0, display: 'flex', background: cor.navBg, borderTop: `1px solid ${cor.borda}`, padding: '8px 4px calc(8px + env(safe-area-inset-bottom))' }}>
-              {abas.map(({ id, label, icone: Icone }) => {
-                const ativa = aba === id;
-                const temBadge = (id === 'devocional' && avisoDevocionalPendente) || (id === 'avisos' && avisosNaoVistos);
-                return (
-                  <button
-                    key={id}
-                    onClick={() => setAba(id)}
-                    style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, padding: '6px 0', background: 'transparent', border: 'none', cursor: 'pointer' }}
-                  >
-                    <div style={{ position: 'relative' }}>
-                      <Icone size={18} color={ativa ? cor.ouro : cor.mudo} strokeWidth={ativa ? 2.4 : 1.9} />
-                      {temBadge && (
-                        <span style={{ position: 'absolute', top: -2, right: -3, width: 8, height: 8, borderRadius: '50%', background: cor.erro, border: `1.5px solid ${cor.bg}` }} />
-                      )}
-                    </div>
-                    <span style={{ fontFamily: 'Inter', fontSize: 9.5, fontWeight: ativa ? 700 : 500, color: ativa ? cor.ouro : cor.mudo }}>{label}</span>
-                  </button>
-                );
-              })}
+            <div style={{ position: 'sticky', bottom: 0, background: cor.navBg, borderTop: `1px solid ${cor.borda}`, padding: '8px 4px calc(8px + env(safe-area-inset-bottom))' }}>
+              <GooeyNav
+                items={abas.map(({ id, label, icone }) => ({
+                  id,
+                  label,
+                  icone,
+                  badge: (id === 'devocional' && avisoDevocionalPendente) || (id === 'avisos' && avisosNaoVistos),
+                }))}
+                activeId={aba}
+                onChange={setAba}
+                colors={{ active: cor.ouro, activeSoft: cor.ouroSuave, muted: cor.mudo, badge: cor.erro, bg: cor.navBg }}
+                particleCount={12}
+                particleDistances={[60, 10]}
+                particleR={70}
+                animationTime={500}
+                timeVariance={400}
+              />
             </div>
           </>
         )}
