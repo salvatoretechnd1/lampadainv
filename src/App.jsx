@@ -1795,12 +1795,15 @@ function AbaAvisos({ membros, meuNome }) {
   const agenda = Object.entries(dados)
     .flatMap(([dId, eventos]) => eventos.map((e) => ({ ...e, data: dId })))
     .sort((a, b) => a.data.localeCompare(b.data) || (a.horario || '').localeCompare(b.horario || ''));
+  // só os que ainda vão acontecer — usada na lista "Agenda de {mês}" (some
+  // da lista assim que a data passa, mas o evento continua na Galeria)
+  const agendaFutura = agenda.filter((e) => e.data >= hojeId);
 
   const DIAS_NOME_COMPLETO = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
   const exportarAgenda = () => {
-    if (agenda.length === 0) return;
+    if (agendaFutura.length === 0) return;
     let texto = `📅 Agenda de ${MESES[mes]} — Lâmpada\n\n`;
-    agenda.forEach((e) => {
+    agendaFutura.forEach((e) => {
       const [a, m, d] = e.data.split('-').map(Number);
       const diaSemana = DIAS_NOME_COMPLETO[new Date(a, m - 1, d).getDay()];
       texto += `${pad(d)}/${pad(m)} (${diaSemana})\n${e.titulo}${e.horario ? ` · ${e.horario}` : ''}\n`;
@@ -2105,7 +2108,7 @@ function AbaAvisos({ membros, meuNome }) {
         </div>
       )}
 
-      {agenda.length > 0 && (
+      {agendaFutura.length > 0 && (
         <div style={{ marginTop: 22 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
             <h3 style={{ fontFamily: 'Fraunces', fontWeight: 600, fontSize: 16.5, color: cor.texto, margin: 0 }}>Agenda de {MESES[mes]}</h3>
@@ -2114,7 +2117,7 @@ function AbaAvisos({ membros, meuNome }) {
             </button>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {agenda.map((e) => (
+            {agendaFutura.map((e) => (
               <div key={e.id} style={{ display: 'flex', alignItems: 'center', gap: 12, background: cor.painel, border: `1px solid ${cor.borda}`, borderRadius: 12, padding: '10px 13px' }}>
                 <div style={{ width: 40, textAlign: 'center', flexShrink: 0 }}>
                   <div style={{ fontFamily: 'JetBrains Mono', fontWeight: 700, fontSize: 15, color: cor.ouro }}>{e.data.slice(-2)}</div>
