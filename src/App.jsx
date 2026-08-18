@@ -1045,6 +1045,45 @@ function OrbitaMembros({ membros, onSelecionar }) {
   );
 }
 
+/* ---------------------------------------------------------
+   FAIXA DE ONDA — só na tela de login (TelaNome)
+--------------------------------------------------------- */
+function FaixaOndaInicio({ texto = 'APLICATIVO PARA OS JOVENS DA IGREJA INV RIO COMPRIDO' }) {
+  const VIEW_W = 1200;
+  const VIEW_H = 220;
+  const CY = VIEW_H / 2;
+  const d = `M -320 ${CY} Q -160 ${CY - 45} 0 ${CY} T 320 ${CY} T 640 ${CY} T 960 ${CY} T 1280 ${CY} T ${VIEW_W + 320} ${CY}`;
+  const pathId = 'faixa-onda-inicio-path';
+  const unidade = `${texto}\u00A0✦\u00A0`;
+  const loopTexto = unidade.repeat(4);
+  const trackRef = useRef(null);
+
+  useEffect(() => {
+    const reduzido = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reduzido) return undefined;
+    let offset = 0;
+    let ativo = true;
+    const passo = () => {
+      if (!ativo) return;
+      offset -= 1.1;
+      if (offset < -1600) offset = 0;
+      if (trackRef.current) trackRef.current.setAttribute('startOffset', String(offset));
+      requestAnimationFrame(passo);
+    };
+    const raf = requestAnimationFrame(passo);
+    return () => { ativo = false; cancelAnimationFrame(raf); };
+  }, []);
+
+  return (
+    <svg viewBox={`0 0 ${VIEW_W} ${VIEW_H}`} preserveAspectRatio="xMidYMid meet" style={{ width: '100%', height: 56, display: 'block' }}>
+      <path id={pathId} d={d} fill="none" stroke="#5227FF" strokeWidth={68} strokeLinecap="round" strokeLinejoin="round" />
+      <text fontFamily="Inter" fontWeight={800} fontSize={22} letterSpacing={1.5} fill="#ffffff" dominantBaseline="central">
+        <textPath ref={trackRef} href={`#${pathId}`} startOffset={0}>{loopTexto}</textPath>
+      </text>
+    </svg>
+  );
+}
+
 function TelaNome({ onEntrar, membros, onCadastrarMembro }) {
   const [valor, setValor] = useState('');
   const [senha, setSenha] = useState('');
@@ -1053,29 +1092,17 @@ function TelaNome({ onEntrar, membros, onCadastrarMembro }) {
   const [modo, setModo] = useState('entrar'); // 'entrar' | 'cadastrar'
   const [processando, setProcessando] = useState(false);
   const [erro, setErro] = useState('');
-  const [fotoFile, setFotoFile] = useState(null);
-  const [fotoPreview, setFotoPreview] = useState('');
 
   const trocarModo = (novoModo) => {
     setModo(novoModo);
     setErro('');
     setSenha('');
-    setFotoFile(null);
-    setFotoPreview('');
-  };
-
-  const escolherFoto = (file) => {
-    if (!file) return;
-    setFotoFile(file);
-    setFotoPreview(URL.createObjectURL(file));
-    setErro('');
   };
 
   const confirmar = async () => {
     const nomeLimpo = valor.trim();
     if (!nomeLimpo) return;
     if (!senha.trim()) { setErro('Digite uma senha.'); return; }
-    if (modo === 'cadastrar' && !fotoFile) { setErro('Só é possível se cadastrar enviando uma foto de perfil.'); return; }
     setErro('');
     setProcessando(true);
     const chave = `conta:${nomeLimpo.toLowerCase()}`;
@@ -1096,7 +1123,7 @@ function TelaNome({ onEntrar, membros, onCadastrarMembro }) {
         const jaEhMembro = membros.some((m) => m.nome.trim().toLowerCase() === nomeLimpo.toLowerCase());
         const aniversario = diaNiver && mesNiver ? `${diaNiver}/${mesNiver}` : '';
         if (!jaEhMembro && onCadastrarMembro) {
-          await onCadastrarMembro(nomeLimpo, aniversario, fotoFile);
+          await onCadastrarMembro(nomeLimpo, aniversario);
         }
         onEntrar(nomeLimpo);
       } else {
@@ -1171,46 +1198,6 @@ function TelaNome({ onEntrar, membros, onCadastrarMembro }) {
 
         {modo === 'cadastrar' && (
           <div style={{ width: '100%', maxWidth: 280, marginBottom: 14 }}>
-            <p style={{ fontFamily: 'Inter', fontSize: 11.5, color: cor.mudo, margin: '0 0 8px' }}>
-              Foto de perfil <span style={{ color: cor.erro }}>· obrigatória</span> — só é possível se cadastrar enviando uma foto.
-            </p>
-            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 4 }}>
-              <label htmlFor="foto-cadastro" style={{ cursor: 'pointer', position: 'relative', display: 'block' }}>
-                {fotoPreview ? (
-                  <img
-                    src={fotoPreview}
-                    alt="Sua foto"
-                    style={{ width: 72, height: 72, borderRadius: '50%', objectFit: 'cover', border: `1.5px solid ${cor.ouro}` }}
-                  />
-                ) : (
-                  <div
-                    style={{
-                      width: 72, height: 72, borderRadius: '50%', border: `1.5px dashed ${cor.borda}`,
-                      display: 'flex', alignItems: 'center', justifyContent: 'center', background: cor.painel,
-                    }}
-                  >
-                    <Camera size={22} color={cor.mudo} />
-                  </div>
-                )}
-                <span
-                  style={{
-                    position: 'absolute', bottom: -2, right: -2, width: 22, height: 22, borderRadius: '50%',
-                    background: cor.ouro, display: 'flex', alignItems: 'center', justifyContent: 'center', border: `1.5px solid ${cor.bg}`,
-                  }}
-                >
-                  <Camera size={11} color="#161B33" />
-                </span>
-              </label>
-              <input
-                id="foto-cadastro" type="file" accept="image/*" style={{ display: 'none' }}
-                onChange={(e) => { if (e.target.files[0]) escolherFoto(e.target.files[0]); e.target.value = ''; }}
-              />
-            </div>
-          </div>
-        )}
-
-        {modo === 'cadastrar' && (
-          <div style={{ width: '100%', maxWidth: 280, marginBottom: 14 }}>
             <p style={{ fontFamily: 'Inter', fontSize: 11.5, color: cor.mudo, margin: '0 0 6px' }}>Seu aniversário — dia e mês (opcional)</p>
             <div style={{ display: 'flex', gap: 8 }}>
               <select
@@ -1243,22 +1230,20 @@ function TelaNome({ onEntrar, membros, onCadastrarMembro }) {
 
         <button
           onClick={confirmar}
-          disabled={!valor.trim() || !senha.trim() || (modo === 'cadastrar' && !fotoFile) || processando}
+          disabled={!valor.trim() || !senha.trim() || processando}
           style={{
             width: '100%', maxWidth: 280, padding: '13px 16px', borderRadius: 12, border: 'none',
-            background: (valor.trim() && senha.trim() && (modo !== 'cadastrar' || fotoFile)) ? cor.ouro : cor.mudoSuave,
-            color: (valor.trim() && senha.trim() && (modo !== 'cadastrar' || fotoFile)) ? '#161B33' : cor.mudo,
-            fontFamily: 'Inter', fontWeight: 700, fontSize: 15,
-            cursor: (valor.trim() && senha.trim() && (modo !== 'cadastrar' || fotoFile)) ? 'pointer' : 'default',
+            background: valor.trim() && senha.trim() ? cor.ouro : cor.mudoSuave, color: valor.trim() && senha.trim() ? '#161B33' : cor.mudo,
+            fontFamily: 'Inter', fontWeight: 700, fontSize: 15, cursor: valor.trim() && senha.trim() ? 'pointer' : 'default',
           }}
         >
           {processando ? 'Só um instante…' : modo === 'cadastrar' ? 'Criar conta' : 'Entrar'}
         </button>
       </div>
 
-      <p style={{ fontFamily: 'Inter', fontSize: 12, color: cor.mudo, margin: '18px 0 0', lineHeight: 1.5 }}>
-        App criado para os jovens da Igreja de Nova Vida do Rio Comprido
-      </p>
+      <div style={{ marginTop: 18 }}>
+        <FaixaOndaInicio />
+      </div>
     </div>
   );
 }
@@ -3897,19 +3882,11 @@ export default function App() {
     window.storage.set('meu-tema', novo, false).catch(() => {});
   };
 
-  const adicionarMembro = async (nomeNovo, aniversarioNovo, fotoFile) => {
+  const adicionarMembro = async (nomeNovo, aniversarioNovo) => {
     const novo = { id: gerarId(), nome: nomeNovo, aniversario: aniversarioNovo || undefined };
     const lista = [...membrosBase, novo];
     setMembrosBase(lista);
     try { await window.storage.set('membros', JSON.stringify(lista), true); } catch { /* tenta depois */ }
-    if (fotoFile) {
-      try {
-        const base64 = await redimensionarImagem(fotoFile);
-        const novasFotos = { ...fotos, [novo.id]: base64 };
-        setFotos(novasFotos);
-        await window.storage.set('fotos', JSON.stringify(novasFotos), true);
-      } catch { /* ignora falha pontual na foto — o cadastro do membro já foi feito */ }
-    }
   };
 
   const removerMembro = async (id) => {
