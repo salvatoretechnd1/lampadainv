@@ -6,7 +6,6 @@ import {
   CalendarClock, AlertTriangle,
   Megaphone, Clock, MapPin, Star, Pencil, Send, CheckCircle2, ImagePlus, Download,
 } from 'lucide-react';
-import GooeyNav from './GooeyNav/GooeyNav';
 
 /* ---------------------------------------------------------
    BANCO DE PERGUNTAS
@@ -1046,45 +1045,6 @@ function OrbitaMembros({ membros, onSelecionar }) {
   );
 }
 
-/* ---------------------------------------------------------
-   FAIXA DE ONDA — só na tela de login (TelaNome)
---------------------------------------------------------- */
-function FaixaOndaInicio({ texto = 'APLICATIVO PARA OS JOVENS DA IGREJA INV RIO COMPRIDO' }) {
-  const VIEW_W = 1200;
-  const VIEW_H = 140;
-  const CY = VIEW_H / 2;
-  const d = `M -320 ${CY} Q -160 15 0 ${CY} T 320 ${CY} T 640 ${CY} T 960 ${CY} T 1280 ${CY} T ${VIEW_W + 320} ${CY}`;
-  const pathId = 'faixa-onda-inicio-path';
-  const unidade = `${texto}\u00A0✦\u00A0`;
-  const loopTexto = unidade.repeat(4);
-  const trackRef = useRef(null);
-
-  useEffect(() => {
-    const reduzido = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    if (reduzido) return undefined;
-    let offset = 0;
-    let ativo = true;
-    const passo = () => {
-      if (!ativo) return;
-      offset -= 1.1;
-      if (offset < -1600) offset = 0;
-      if (trackRef.current) trackRef.current.setAttribute('startOffset', String(offset));
-      requestAnimationFrame(passo);
-    };
-    const raf = requestAnimationFrame(passo);
-    return () => { ativo = false; cancelAnimationFrame(raf); };
-  }, []);
-
-  return (
-    <svg viewBox={`0 0 ${VIEW_W} ${VIEW_H}`} preserveAspectRatio="xMidYMid slice" style={{ width: '100%', height: 64, display: 'block' }}>
-      <path id={pathId} d={d} fill="none" stroke="#5227FF" strokeWidth={96} strokeLinecap="round" strokeLinejoin="round" />
-      <text fontFamily="Inter" fontWeight={800} fontSize={26} letterSpacing={2} fill="#ffffff" dominantBaseline="central">
-        <textPath ref={trackRef} href={`#${pathId}`} startOffset={0}>{loopTexto}</textPath>
-      </text>
-    </svg>
-  );
-}
-
 function TelaNome({ onEntrar, membros, onCadastrarMembro }) {
   const [valor, setValor] = useState('');
   const [senha, setSenha] = useState('');
@@ -1093,17 +1053,29 @@ function TelaNome({ onEntrar, membros, onCadastrarMembro }) {
   const [modo, setModo] = useState('entrar'); // 'entrar' | 'cadastrar'
   const [processando, setProcessando] = useState(false);
   const [erro, setErro] = useState('');
+  const [fotoFile, setFotoFile] = useState(null);
+  const [fotoPreview, setFotoPreview] = useState('');
 
   const trocarModo = (novoModo) => {
     setModo(novoModo);
     setErro('');
     setSenha('');
+    setFotoFile(null);
+    setFotoPreview('');
+  };
+
+  const escolherFoto = (file) => {
+    if (!file) return;
+    setFotoFile(file);
+    setFotoPreview(URL.createObjectURL(file));
+    setErro('');
   };
 
   const confirmar = async () => {
     const nomeLimpo = valor.trim();
     if (!nomeLimpo) return;
     if (!senha.trim()) { setErro('Digite uma senha.'); return; }
+    if (modo === 'cadastrar' && !fotoFile) { setErro('Só é possível se cadastrar enviando uma foto de perfil.'); return; }
     setErro('');
     setProcessando(true);
     const chave = `conta:${nomeLimpo.toLowerCase()}`;
@@ -1124,7 +1096,7 @@ function TelaNome({ onEntrar, membros, onCadastrarMembro }) {
         const jaEhMembro = membros.some((m) => m.nome.trim().toLowerCase() === nomeLimpo.toLowerCase());
         const aniversario = diaNiver && mesNiver ? `${diaNiver}/${mesNiver}` : '';
         if (!jaEhMembro && onCadastrarMembro) {
-          await onCadastrarMembro(nomeLimpo, aniversario);
+          await onCadastrarMembro(nomeLimpo, aniversario, fotoFile);
         }
         onEntrar(nomeLimpo);
       } else {
@@ -1158,10 +1130,6 @@ function TelaNome({ onEntrar, membros, onCadastrarMembro }) {
           <br />
           <span style={{ fontFamily: 'Inter', fontStyle: 'normal', fontSize: 11 }}>Salmos 119:105 · NAA</span>
         </p>
-
-        <div style={{ width: '100%', maxWidth: 320, marginBottom: 20 }}>
-          <FaixaOndaInicio />
-        </div>
 
         <div style={{ display: 'flex', gap: 8, width: '100%', maxWidth: 280, marginBottom: 14 }}>
           <button
@@ -1203,6 +1171,46 @@ function TelaNome({ onEntrar, membros, onCadastrarMembro }) {
 
         {modo === 'cadastrar' && (
           <div style={{ width: '100%', maxWidth: 280, marginBottom: 14 }}>
+            <p style={{ fontFamily: 'Inter', fontSize: 11.5, color: cor.mudo, margin: '0 0 8px' }}>
+              Foto de perfil <span style={{ color: cor.erro }}>· obrigatória</span> — só é possível se cadastrar enviando uma foto.
+            </p>
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 4 }}>
+              <label htmlFor="foto-cadastro" style={{ cursor: 'pointer', position: 'relative', display: 'block' }}>
+                {fotoPreview ? (
+                  <img
+                    src={fotoPreview}
+                    alt="Sua foto"
+                    style={{ width: 72, height: 72, borderRadius: '50%', objectFit: 'cover', border: `1.5px solid ${cor.ouro}` }}
+                  />
+                ) : (
+                  <div
+                    style={{
+                      width: 72, height: 72, borderRadius: '50%', border: `1.5px dashed ${cor.borda}`,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', background: cor.painel,
+                    }}
+                  >
+                    <Camera size={22} color={cor.mudo} />
+                  </div>
+                )}
+                <span
+                  style={{
+                    position: 'absolute', bottom: -2, right: -2, width: 22, height: 22, borderRadius: '50%',
+                    background: cor.ouro, display: 'flex', alignItems: 'center', justifyContent: 'center', border: `1.5px solid ${cor.bg}`,
+                  }}
+                >
+                  <Camera size={11} color="#161B33" />
+                </span>
+              </label>
+              <input
+                id="foto-cadastro" type="file" accept="image/*" style={{ display: 'none' }}
+                onChange={(e) => { if (e.target.files[0]) escolherFoto(e.target.files[0]); e.target.value = ''; }}
+              />
+            </div>
+          </div>
+        )}
+
+        {modo === 'cadastrar' && (
+          <div style={{ width: '100%', maxWidth: 280, marginBottom: 14 }}>
             <p style={{ fontFamily: 'Inter', fontSize: 11.5, color: cor.mudo, margin: '0 0 6px' }}>Seu aniversário — dia e mês (opcional)</p>
             <div style={{ display: 'flex', gap: 8 }}>
               <select
@@ -1235,11 +1243,13 @@ function TelaNome({ onEntrar, membros, onCadastrarMembro }) {
 
         <button
           onClick={confirmar}
-          disabled={!valor.trim() || !senha.trim() || processando}
+          disabled={!valor.trim() || !senha.trim() || (modo === 'cadastrar' && !fotoFile) || processando}
           style={{
             width: '100%', maxWidth: 280, padding: '13px 16px', borderRadius: 12, border: 'none',
-            background: valor.trim() && senha.trim() ? cor.ouro : cor.mudoSuave, color: valor.trim() && senha.trim() ? '#161B33' : cor.mudo,
-            fontFamily: 'Inter', fontWeight: 700, fontSize: 15, cursor: valor.trim() && senha.trim() ? 'pointer' : 'default',
+            background: (valor.trim() && senha.trim() && (modo !== 'cadastrar' || fotoFile)) ? cor.ouro : cor.mudoSuave,
+            color: (valor.trim() && senha.trim() && (modo !== 'cadastrar' || fotoFile)) ? '#161B33' : cor.mudo,
+            fontFamily: 'Inter', fontWeight: 700, fontSize: 15,
+            cursor: (valor.trim() && senha.trim() && (modo !== 'cadastrar' || fotoFile)) ? 'pointer' : 'default',
           }}
         >
           {processando ? 'Só um instante…' : modo === 'cadastrar' ? 'Criar conta' : 'Entrar'}
@@ -3887,11 +3897,19 @@ export default function App() {
     window.storage.set('meu-tema', novo, false).catch(() => {});
   };
 
-  const adicionarMembro = async (nomeNovo, aniversarioNovo) => {
+  const adicionarMembro = async (nomeNovo, aniversarioNovo, fotoFile) => {
     const novo = { id: gerarId(), nome: nomeNovo, aniversario: aniversarioNovo || undefined };
     const lista = [...membrosBase, novo];
     setMembrosBase(lista);
     try { await window.storage.set('membros', JSON.stringify(lista), true); } catch { /* tenta depois */ }
+    if (fotoFile) {
+      try {
+        const base64 = await redimensionarImagem(fotoFile);
+        const novasFotos = { ...fotos, [novo.id]: base64 };
+        setFotos(novasFotos);
+        await window.storage.set('fotos', JSON.stringify(novasFotos), true);
+      } catch { /* ignora falha pontual na foto — o cadastro do membro já foi feito */ }
+    }
   };
 
   const removerMembro = async (id) => {
@@ -4005,23 +4023,26 @@ export default function App() {
               {aba === 'ranking' && <AbaRanking membros={membros} onAbrirPerfil={setPerfilAberto} />}
             </div>
 
-            <div style={{ position: 'sticky', bottom: 0, background: cor.navBg, borderTop: `1px solid ${cor.borda}`, padding: '8px 4px calc(8px + env(safe-area-inset-bottom))' }}>
-              <GooeyNav
-                items={abas.map(({ id, label, icone }) => ({
-                  id,
-                  label,
-                  icone,
-                  badge: (id === 'devocional' && avisoDevocionalPendente) || (id === 'avisos' && avisosNaoVistos),
-                }))}
-                activeId={aba}
-                onChange={setAba}
-                colors={{ active: cor.ouro, activeSoft: cor.ouroSuave, muted: cor.mudo, badge: cor.erro, bg: cor.navBg }}
-                particleCount={12}
-                particleDistances={[60, 10]}
-                particleR={70}
-                animationTime={500}
-                timeVariance={400}
-              />
+            <div style={{ position: 'sticky', bottom: 0, display: 'flex', background: cor.navBg, borderTop: `1px solid ${cor.borda}`, padding: '8px 4px calc(8px + env(safe-area-inset-bottom))' }}>
+              {abas.map(({ id, label, icone: Icone }) => {
+                const ativa = aba === id;
+                const temBadge = (id === 'devocional' && avisoDevocionalPendente) || (id === 'avisos' && avisosNaoVistos);
+                return (
+                  <button
+                    key={id}
+                    onClick={() => setAba(id)}
+                    style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, padding: '6px 0', background: 'transparent', border: 'none', cursor: 'pointer' }}
+                  >
+                    <div style={{ position: 'relative' }}>
+                      <Icone size={18} color={ativa ? cor.ouro : cor.mudo} strokeWidth={ativa ? 2.4 : 1.9} />
+                      {temBadge && (
+                        <span style={{ position: 'absolute', top: -2, right: -3, width: 8, height: 8, borderRadius: '50%', background: cor.erro, border: `1.5px solid ${cor.bg}` }} />
+                      )}
+                    </div>
+                    <span style={{ fontFamily: 'Inter', fontSize: 9.5, fontWeight: ativa ? 700 : 500, color: ativa ? cor.ouro : cor.mudo }}>{label}</span>
+                  </button>
+                );
+              })}
             </div>
           </>
         )}
