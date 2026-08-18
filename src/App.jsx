@@ -1241,7 +1241,7 @@ function TelaNome({ onEntrar, membros, onCadastrarMembro }) {
         </button>
       </div>
 
-      <div style={{ marginTop: 18 }}>
+      <div style={{ width: '100%', maxWidth: 280, margin: '18px auto 0' }}>
         <FaixaOndaInicio />
       </div>
     </div>
