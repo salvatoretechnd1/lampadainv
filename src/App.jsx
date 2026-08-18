@@ -5,6 +5,7 @@ import {
   Sun, Moon, Share2, Cake, BellRing, ArrowLeft, Sparkles, LogOut, Gem, Award, RefreshCw,
   CalendarClock, AlertTriangle,
   Megaphone, Clock, MapPin, Star, Pencil, Send, CheckCircle2, ImagePlus, Download,
+  GraduationCap, ArrowUpDown,
 } from 'lucide-react';
 
 /* ---------------------------------------------------------
@@ -3526,6 +3527,319 @@ function SecaoRanking({ titulo, icone, lista, sufixo, membros, onAbrirPerfil, co
   );
 }
 
+/* ---------------------------------------------------------
+   ABA: ENSINO (memorização dos livros da Bíblia, por blocos)
+--------------------------------------------------------- */
+const BLOCOS_MEMORIZACAO = [
+  { id: 'pentateuco', titulo: 'Pentateuco', testamento: 'AT', livros: ['Gênesis', 'Êxodo', 'Levítico', 'Números', 'Deuteronômio'] },
+  { id: 'historicos-at', titulo: 'Históricos', testamento: 'AT', livros: ['Josué', 'Juízes', 'Rute', '1 Samuel', '2 Samuel', '1 Reis', '2 Reis', '1 Crônicas', '2 Crônicas', 'Esdras', 'Neemias', 'Ester'] },
+  { id: 'poeticos', titulo: 'Poéticos', testamento: 'AT', livros: ['Jó', 'Salmos', 'Provérbios', 'Eclesiastes', 'Cantares de Salomão'] },
+  { id: 'profetas-maiores', titulo: 'Profetas Maiores', testamento: 'AT', livros: ['Isaías', 'Jeremias', 'Lamentações', 'Ezequiel', 'Daniel'] },
+  { id: 'profetas-menores', titulo: 'Profetas Menores', testamento: 'AT', livros: ['Oséias', 'Joel', 'Amós', 'Obadias', 'Jonas', 'Miquéias', 'Naum', 'Habacuque', 'Sofonias', 'Ageu', 'Zacarias', 'Malaquias'] },
+  { id: 'evangelhos', titulo: 'Evangelhos', testamento: 'NT', livros: ['Mateus', 'Marcos', 'Lucas', 'João'] },
+  { id: 'historico-nt', titulo: 'Histórico', testamento: 'NT', livros: ['Atos'] },
+  { id: 'cartas-paulo', titulo: 'Cartas de Paulo', testamento: 'NT', livros: ['Romanos', '1 Coríntios', '2 Coríntios', 'Gálatas', 'Efésios', 'Filipenses', 'Colossenses', '1 Tessalonicenses', '2 Tessalonicenses', '1 Timóteo', '2 Timóteo', 'Tito', 'Filemom'] },
+  { id: 'cartas-gerais', titulo: 'Cartas Gerais', testamento: 'NT', livros: ['Hebreus', 'Tiago', '1 Pedro', '2 Pedro', '1 João', '2 João', '3 João', 'Judas'] },
+  { id: 'profetico-nt', titulo: 'Profético', testamento: 'NT', livros: ['Apocalipse'] },
+];
+const TOTAL_LIVROS_BIBLIA = BLOCOS_MEMORIZACAO.reduce((s, b) => s + b.livros.length, 0);
+
+function embaralharLivros(livros) {
+  const arr = [...livros];
+  for (let i = arr.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  const igual = arr.every((l, i) => l === livros[i]);
+  return igual && livros.length > 1 ? embaralharLivros(livros) : arr;
+}
+
+function formatarTempo(segundos) {
+  const m = Math.floor(segundos / 60);
+  const s = segundos % 60;
+  return `${m}:${s < 10 ? '0' : ''}${s}`;
+}
+
+function TesteBloco({ bloco, recordeAtual, onFechar, onNovoRecorde }) {
+  const [ordem, setOrdem] = useState(() => embaralharLivros(bloco.livros));
+  const [selecionado, setSelecionado] = useState(null);
+  const [segundos, setSegundos] = useState(0);
+  const [rodando, setRodando] = useState(true);
+  const [finalizado, setFinalizado] = useState(false);
+  const [bateuRecorde, setBateuRecorde] = useState(false);
+
+  useEffect(() => {
+    if (!rodando) return undefined;
+    const id = setInterval(() => setSegundos((s) => s + 1), 1000);
+    return () => clearInterval(id);
+  }, [rodando]);
+
+  const tocar = (i) => {
+    if (finalizado) return;
+    if (selecionado === null) {
+      setSelecionado(i);
+    } else if (selecionado === i) {
+      setSelecionado(null);
+    } else {
+      const nova = [...ordem];
+      [nova[selecionado], nova[i]] = [nova[i], nova[selecionado]];
+      setOrdem(nova);
+      setSelecionado(null);
+    }
+  };
+
+  const conferir = () => {
+    const certo = ordem.every((l, i) => l === bloco.livros[i]);
+    if (!certo) return;
+    setRodando(false);
+    setFinalizado(true);
+    const bateu = recordeAtual === undefined || segundos < recordeAtual;
+    setBateuRecorde(bateu);
+    if (bateu) onNovoRecorde(bloco.id, segundos);
+  };
+
+  const reiniciar = () => {
+    setOrdem(embaralharLivros(bloco.livros));
+    setSelecionado(null);
+    setSegundos(0);
+    setRodando(true);
+    setFinalizado(false);
+    setBateuRecorde(false);
+  };
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 70, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }} onClick={onFechar}>
+      <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: 360, background: cor.painel, border: `1px solid ${cor.ouro}`, borderRadius: 18, padding: 20, maxHeight: '85vh', overflowY: 'auto' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+          <span style={{ fontFamily: 'Fraunces', fontWeight: 600, fontSize: 17, color: cor.texto }}>{bloco.titulo}</span>
+          <button onClick={onFechar} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 4 }}>
+            <X size={17} color={cor.mudo} />
+          </button>
+        </div>
+        <p style={{ fontFamily: 'Inter', fontSize: 12.5, color: cor.mudo, margin: '0 0 14px' }}>
+          Toque em dois livros para trocar de lugar até ficar na ordem certa.
+        </p>
+
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+            <Clock size={13} color={cor.mudo} />
+            <span style={{ fontFamily: 'JetBrains Mono', fontSize: 16, fontWeight: 700, color: cor.texto }}>{formatarTempo(segundos)}</span>
+          </div>
+          {recordeAtual !== undefined && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+              <Award size={13} color={cor.ouro} />
+              <span style={{ fontFamily: 'JetBrains Mono', fontSize: 12, color: cor.ouro }}>recorde {formatarTempo(recordeAtual)}</span>
+            </div>
+          )}
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+          {ordem.map((livro, i) => {
+            const ativo = selecionado === i;
+            return (
+              <button
+                key={livro}
+                onClick={() => tocar(i)}
+                disabled={finalizado}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 10, width: '100%', textAlign: 'left',
+                  padding: '10px 12px', borderRadius: 10, cursor: finalizado ? 'default' : 'pointer',
+                  border: `1.5px solid ${ativo ? cor.ouro : cor.borda}`,
+                  background: ativo ? 'rgba(227,178,60,0.14)' : cor.painelAlt,
+                }}
+              >
+                <span style={{ fontFamily: 'JetBrains Mono', fontSize: 12, color: cor.mudo, width: 16 }}>{i + 1}</span>
+                <span style={{ fontFamily: 'Inter', fontSize: 14, fontWeight: 500, color: cor.texto, flex: 1 }}>{livro}</span>
+                <ArrowUpDown size={14} color={cor.mudoSuave} />
+              </button>
+            );
+          })}
+        </div>
+
+        {finalizado && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 14, padding: '10px 12px', borderRadius: 10, background: 'rgba(111,162,135,0.14)' }}>
+            <CheckCircle2 size={16} color={cor.sucesso} />
+            <span style={{ fontFamily: 'Inter', fontSize: 12.5, fontWeight: 600, color: cor.sucesso }}>
+              {bateuRecorde ? `Novo recorde: ${formatarTempo(segundos)}!` : `Certo! Tempo: ${formatarTempo(segundos)}`}
+            </span>
+          </div>
+        )}
+
+        <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
+          {!finalizado ? (
+            <>
+              <button onClick={conferir} style={{ flex: 1, padding: '11px 0', borderRadius: 10, border: 'none', background: cor.ouro, color: cor.painel, fontFamily: 'Inter', fontWeight: 700, fontSize: 13.5, cursor: 'pointer' }}>
+                Conferir ordem
+              </button>
+              <button onClick={reiniciar} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '11px 14px', borderRadius: 10, border: `1px solid ${cor.borda}`, background: 'transparent', cursor: 'pointer' }}>
+                <RefreshCw size={14} color={cor.mudo} />
+              </button>
+            </>
+          ) : (
+            <button onClick={reiniciar} style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '11px 0', borderRadius: 10, border: 'none', background: cor.ouro, color: cor.painel, fontFamily: 'Inter', fontWeight: 700, fontSize: 13.5, cursor: 'pointer' }}>
+              <RefreshCw size={14} /> Tentar de novo
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AbaEnsino({ meuNome }) {
+  const [marcados, setMarcados] = useState({});
+  const [recordes, setRecordes] = useState({});
+  const [carregando, setCarregando] = useState(true);
+  const [abertos, setAbertos] = useState(() => new Set());
+  const [blocoTeste, setBlocoTeste] = useState(null);
+
+  useEffect(() => {
+    (async () => {
+      setCarregando(true);
+      const [rMarcados, rRecordes] = await Promise.allSettled([
+        window.storage.get(`memorizacao:${meuNome}`, true),
+        window.storage.get(`testes:${meuNome}`, true),
+      ]);
+      setMarcados(rMarcados.status === 'fulfilled' && rMarcados.value ? JSON.parse(rMarcados.value.value) : {});
+      setRecordes(rRecordes.status === 'fulfilled' && rRecordes.value ? JSON.parse(rRecordes.value.value) : {});
+      setCarregando(false);
+    })();
+  }, [meuNome]);
+
+  const alternarLivro = async (livro) => {
+    const novo = { ...marcados, [livro]: !marcados[livro] };
+    if (!novo[livro]) delete novo[livro];
+    setMarcados(novo);
+    try { await window.storage.set(`memorizacao:${meuNome}`, JSON.stringify(novo), true); } catch { /* tenta depois */ }
+  };
+
+  const alternarBloco = (id) => {
+    const novo = new Set(abertos);
+    novo.has(id) ? novo.delete(id) : novo.add(id);
+    setAbertos(novo);
+  };
+
+  const salvarRecorde = async (blocoId, segundos) => {
+    const novo = { ...recordes, [blocoId]: segundos };
+    setRecordes(novo);
+    try { await window.storage.set(`testes:${meuNome}`, JSON.stringify(novo), true); } catch { /* tenta depois */ }
+  };
+
+  const totalMarcados = Object.values(marcados).filter(Boolean).length;
+  const pctGeral = Math.round((totalMarcados / TOTAL_LIVROS_BIBLIA) * 100);
+
+  if (carregando) {
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', padding: 60 }}>
+        <Loader2 className="spin" size={22} color={cor.ouro} />
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ padding: '4px 18px 100px' }}>
+      <h2 style={{ fontFamily: 'Fraunces', fontWeight: 600, fontSize: 21, color: cor.texto, margin: '14px 0 4px' }}>Ensino</h2>
+      <p style={{ fontFamily: 'Inter', fontSize: 13, color: cor.mudo, margin: '0 0 16px' }}>
+        Marque os livros que você já consegue citar de memória, em ordem, por bloco.
+      </p>
+
+      <div style={{ background: cor.painel, border: `1px solid ${cor.borda}`, borderRadius: 16, padding: 14, marginBottom: 16 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+          <span style={{ fontFamily: 'Inter', fontWeight: 700, fontSize: 13, color: cor.texto }}>Progresso geral</span>
+          <span style={{ fontFamily: 'JetBrains Mono', fontSize: 12, color: cor.ouro, fontWeight: 700 }}>{totalMarcados}/{TOTAL_LIVROS_BIBLIA}</span>
+        </div>
+        <div style={{ width: '100%', height: 8, borderRadius: 4, background: cor.painelAlt, overflow: 'hidden' }}>
+          <div style={{ width: `${pctGeral}%`, height: '100%', background: cor.ouro, borderRadius: 4, transition: 'width 0.3s ease' }} />
+        </div>
+      </div>
+
+      {['AT', 'NT'].map((testamento) => (
+        <div key={testamento} style={{ marginBottom: 18 }}>
+          <span style={{ fontFamily: 'Inter', fontWeight: 700, fontSize: 11, color: cor.mudo, textTransform: 'uppercase', letterSpacing: 0.6 }}>
+            {testamento === 'AT' ? 'Antigo Testamento' : 'Novo Testamento'}
+          </span>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 8 }}>
+            {BLOCOS_MEMORIZACAO.filter((b) => b.testamento === testamento).map((bloco) => {
+              const marcadosBloco = bloco.livros.filter((l) => marcados[l]).length;
+              const completo = marcadosBloco === bloco.livros.length;
+              const aberto = abertos.has(bloco.id);
+              return (
+                <div key={bloco.id} style={{ background: cor.painel, border: `1px solid ${completo ? cor.ouro : cor.borda}`, borderRadius: 14, overflow: 'hidden' }}>
+                  <button
+                    onClick={() => alternarBloco(bloco.id)}
+                    style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', background: 'transparent', border: 'none', cursor: 'pointer' }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      {completo ? <CheckCircle2 size={16} color={cor.ouro} /> : <BookOpen size={15} color={cor.mudo} />}
+                      <span style={{ fontFamily: 'Fraunces', fontWeight: 600, fontSize: 14.5, color: cor.texto }}>{bloco.titulo}</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ fontFamily: 'JetBrains Mono', fontSize: 11.5, color: cor.mudo }}>{marcadosBloco}/{bloco.livros.length}</span>
+                      <ChevronRight size={14} color={cor.mudo} style={{ transform: aberto ? 'rotate(90deg)' : 'none', transition: 'transform 0.2s ease' }} />
+                    </div>
+                  </button>
+                  {completo && (
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: '0 14px 12px' }}>
+                      {recordes[bloco.id] !== undefined ? (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                          <Award size={12} color={cor.ouro} />
+                          <span style={{ fontFamily: 'JetBrains Mono', fontSize: 11, color: cor.mudo }}>recorde {formatarTempo(recordes[bloco.id])}</span>
+                        </div>
+                      ) : <span />}
+                      <button
+                        onClick={() => setBlocoTeste(bloco)}
+                        style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 8, border: `1px solid ${cor.ouro}`, background: 'transparent', color: cor.ouro, fontFamily: 'Inter', fontWeight: 700, fontSize: 11.5, cursor: 'pointer' }}
+                      >
+                        <ArrowUpDown size={12} /> Testar bloco
+                      </button>
+                    </div>
+                  )}
+                  {aberto && (
+                    <div style={{ padding: '0 14px 12px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      {bloco.livros.map((livro) => {
+                        const feito = !!marcados[livro];
+                        return (
+                          <button
+                            key={livro}
+                            onClick={() => alternarLivro(livro)}
+                            style={{
+                              display: 'flex', alignItems: 'center', gap: 10, width: '100%', textAlign: 'left',
+                              padding: '8px 10px', borderRadius: 10, cursor: 'pointer',
+                              border: `1px solid ${feito ? 'rgba(227,178,60,0.35)' : cor.borda}`,
+                              background: feito ? 'rgba(227,178,60,0.10)' : 'transparent',
+                            }}
+                          >
+                            <div style={{
+                              width: 18, height: 18, borderRadius: 5, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                              border: `1.5px solid ${feito ? cor.ouro : cor.mudoSuave}`, background: feito ? cor.ouro : 'transparent',
+                            }}>
+                              {feito && <Check size={12} color={cor.painel} strokeWidth={3} />}
+                            </div>
+                            <span style={{ fontFamily: 'Inter', fontSize: 13, color: feito ? cor.texto : cor.mudo, fontWeight: feito ? 600 : 500 }}>{livro}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+
+      {blocoTeste && (
+        <TesteBloco
+          bloco={blocoTeste}
+          recordeAtual={recordes[blocoTeste.id]}
+          onFechar={() => setBlocoTeste(null)}
+          onNovoRecorde={salvarRecorde}
+        />
+      )}
+    </div>
+  );
+}
+
 function AbaRanking({ membros, onAbrirPerfil }) {
   const [carregando, setCarregando] = useState(true);
   const [hojeMapa, setHojeMapa] = useState({});
@@ -3920,6 +4234,7 @@ export default function App() {
 
   const abas = [
     { id: 'quiz', label: 'Quiz', icone: BookOpen },
+    { id: 'ensino', label: 'Ensino', icone: GraduationCap },
     { id: 'devocional', label: 'Devocional', icone: Mic },
     { id: 'escala', label: 'Escala', icone: CalendarDays },
     { id: 'avisos', label: 'Avisos', icone: Megaphone },
@@ -3981,6 +4296,7 @@ export default function App() {
 
             <div style={{ flex: 1 }}>
               {aba === 'quiz' && <AbaQuiz nome={nome} />}
+              {aba === 'ensino' && <AbaEnsino meuNome={nome} />}
               {aba === 'escala' && <AbaEscala membros={membros} meuNome={nome} />}
               {aba === 'avisos' && <AbaAvisos membros={membros} meuNome={nome} />}
               {aba === 'devocional' && <AbaDevocional membros={membros} meuNome={nome} />}
