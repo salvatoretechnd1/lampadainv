@@ -3574,6 +3574,14 @@ function TesteBloco({ bloco, recordeAtual, onFechar, onNovoRecorde }) {
     return () => clearInterval(id);
   }, [rodando]);
 
+  // trava o scroll da página por trás enquanto o teste está aberto — sem isso
+  // dá pra rolar a tela e ver o bloco expandido com a ordem certa dos livros
+  useEffect(() => {
+    const anterior = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = anterior; };
+  }, []);
+
   const tocar = (i) => {
     if (finalizado) return;
     if (selecionado === null) {
@@ -3719,6 +3727,15 @@ function AbaEnsino({ meuNome }) {
     setAbertos(novo);
   };
 
+  const abrirTeste = (bloco) => {
+    // fecha o bloco expandido antes de testar — senão dá pra rolar a tela
+    // por trás do modal e ver a ordem certa dos livros
+    const novo = new Set(abertos);
+    novo.delete(bloco.id);
+    setAbertos(novo);
+    setBlocoTeste(bloco);
+  };
+
   const salvarRecorde = async (blocoId, segundos) => {
     const novo = { ...recordes, [blocoId]: segundos };
     setRecordes(novo);
@@ -3787,7 +3804,7 @@ function AbaEnsino({ meuNome }) {
                         </div>
                       ) : <span />}
                       <button
-                        onClick={() => setBlocoTeste(bloco)}
+                        onClick={() => abrirTeste(bloco)}
                         style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 8, border: `1px solid ${cor.ouro}`, background: 'transparent', color: cor.ouro, fontFamily: 'Inter', fontWeight: 700, fontSize: 11.5, cursor: 'pointer' }}
                       >
                         <ArrowUpDown size={12} /> Testar bloco
