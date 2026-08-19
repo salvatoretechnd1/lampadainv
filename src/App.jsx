@@ -1749,14 +1749,24 @@ function AbaAvisos({ membros, meuNome }) {
 
   const remover = async (dId, eventoId) => {
     const alvo = (dados[dId] || []).find((e) => e.id === eventoId);
-    const restantes = (dados[dId] || []).filter((e) => e.id !== eventoId);
-    const novo = { ...dados };
-    if (restantes.length > 0) novo[dId] = restantes; else delete novo[dId];
+    const jaPassou = dId < hojeId;
+    let novo;
+    if (jaPassou) {
+      // o evento já aconteceu: mantém o registro (fotos e o pontinho no
+      // calendário) pra lembrar o que foi feito naquele dia, só tira da
+      // lista de detalhes do dia
+      const atualizada = (dados[dId] || []).map((e) => (e.id === eventoId ? { ...e, arquivado: true } : e));
+      novo = { ...dados, [dId]: atualizada };
+    } else {
+      const restantes = (dados[dId] || []).filter((e) => e.id !== eventoId);
+      novo = { ...dados };
+      if (restantes.length > 0) novo[dId] = restantes; else delete novo[dId];
+    }
     setDados(novo);
     if (editandoId === eventoId) limparFormulario();
     try {
       await window.storage.set(`avisos:${mid}`, JSON.stringify(novo), true);
-      if (alvo?.fotos?.length) {
+      if (!jaPassou && alvo?.fotos?.length) {
         await Promise.allSettled(alvo.fotos.map((f) => window.storage.delete(`foto:${f.id}`, true)));
         alvo.fotos.forEach((f) => { delete cacheFotos[f.id]; });
       }
@@ -1855,7 +1865,7 @@ function AbaAvisos({ membros, meuNome }) {
     compartilhar(`Agenda de ${MESES[mes]}`, texto.trim());
   };
 
-  const eventosDoDiaSelecionado = diaSelecionado ? (dados[dateId(diaSelecionado)] || []) : [];
+  const eventosDoDiaSelecionado = diaSelecionado ? (dados[dateId(diaSelecionado)] || []).filter((e) => !e.arquivado) : [];
 
   return (
     <div style={{ padding: '4px 18px 100px' }}>
