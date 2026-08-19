@@ -1147,13 +1147,17 @@ function TelaNome({ onEntrar, membros, onCadastrarMembro }) {
   };
 
   return (
-    <div style={{ minHeight: '100%', display: 'flex', flexDirection: 'column', padding: '26px 28px 18px', textAlign: 'center' }}>
+    <div style={{
+      minHeight: '100%', display: 'flex', flexDirection: 'column', padding: '26px 28px 18px', textAlign: 'center',
+      backgroundImage: "linear-gradient(180deg, rgba(22,27,51,0.55), rgba(22,27,51,0.88)), url('/fundo-login.jpg')",
+      backgroundSize: 'cover', backgroundPosition: 'center', backgroundRepeat: 'no-repeat',
+    }}>
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
         <OrbitaMembros membros={membros} onSelecionar={setValor} />
 
-        <h1 style={{ fontFamily: 'Fraunces', fontWeight: 600, fontSize: 28, color: cor.texto, margin: '4px 0 10px' }}>Lâmpada</h1>
+        <h1 style={{ fontFamily: 'Fraunces', fontWeight: 600, fontSize: 28, color: '#F5EFE0', margin: '4px 0 10px' }}>Lâmpada</h1>
 
-        <p style={{ fontFamily: 'Fraunces', fontStyle: 'italic', fontSize: 13.5, color: cor.mudo, lineHeight: 1.5, margin: '0 0 20px', maxWidth: 260 }}>
+        <p style={{ fontFamily: 'Fraunces', fontStyle: 'italic', fontSize: 13.5, color: 'rgba(245,239,224,0.78)', lineHeight: 1.5, margin: '0 0 20px', maxWidth: 260 }}>
           &ldquo;Lâmpada para os meus pés é a tua palavra, e luz para o meu caminho.&rdquo;
           <br />
           <span style={{ fontFamily: 'Inter', fontStyle: 'normal', fontSize: 11 }}>Salmos 119:105 · NAA</span>
@@ -1162,13 +1166,13 @@ function TelaNome({ onEntrar, membros, onCadastrarMembro }) {
         <div style={{ display: 'flex', gap: 8, width: '100%', maxWidth: 280, marginBottom: 14 }}>
           <button
             onClick={() => trocarModo('entrar')}
-            style={{ flex: 1, padding: '9px 0', borderRadius: 999, border: `1.5px solid ${modo === 'entrar' ? cor.ouro : cor.borda}`, background: modo === 'entrar' ? 'rgba(227,178,60,0.10)' : 'transparent', color: cor.texto, fontFamily: 'Inter', fontWeight: 600, fontSize: 12.5, cursor: 'pointer' }}
+            style={{ flex: 1, padding: '9px 0', borderRadius: 999, border: `1.5px solid ${modo === 'entrar' ? cor.ouro : 'rgba(245,239,224,0.3)'}`, background: modo === 'entrar' ? 'rgba(227,178,60,0.16)' : 'rgba(22,27,51,0.35)', color: '#F5EFE0', fontFamily: 'Inter', fontWeight: 600, fontSize: 12.5, cursor: 'pointer' }}
           >
             Já tenho login
           </button>
           <button
             onClick={() => trocarModo('cadastrar')}
-            style={{ flex: 1, padding: '9px 0', borderRadius: 999, border: `1.5px solid ${modo === 'cadastrar' ? cor.ouro : cor.borda}`, background: modo === 'cadastrar' ? 'rgba(227,178,60,0.10)' : 'transparent', color: cor.texto, fontFamily: 'Inter', fontWeight: 600, fontSize: 12.5, cursor: 'pointer' }}
+            style={{ flex: 1, padding: '9px 0', borderRadius: 999, border: `1.5px solid ${modo === 'cadastrar' ? cor.ouro : 'rgba(245,239,224,0.3)'}`, background: modo === 'cadastrar' ? 'rgba(227,178,60,0.16)' : 'rgba(22,27,51,0.35)', color: '#F5EFE0', fontFamily: 'Inter', fontWeight: 600, fontSize: 12.5, cursor: 'pointer' }}
           >
             Cadastrar
           </button>
@@ -1199,7 +1203,7 @@ function TelaNome({ onEntrar, membros, onCadastrarMembro }) {
 
         {modo === 'cadastrar' && (
           <div style={{ width: '100%', maxWidth: 280, marginBottom: 14 }}>
-            <p style={{ fontFamily: 'Inter', fontSize: 11.5, color: cor.mudo, margin: '0 0 6px' }}>Seu aniversário — dia e mês (opcional)</p>
+            <p style={{ fontFamily: 'Inter', fontSize: 11.5, color: 'rgba(245,239,224,0.7)', margin: '0 0 6px' }}>Seu aniversário — dia e mês (opcional)</p>
             <div style={{ display: 'flex', gap: 8 }}>
               <select
                 value={diaNiver}
