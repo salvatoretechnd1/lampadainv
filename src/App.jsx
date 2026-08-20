@@ -382,14 +382,6 @@ function weekId(d) {
 }
 const DIAS = ['seg', 'ter', 'qua', 'qui', 'sex', 'sab', 'dom'];
 const diaAtual = (d) => DIAS[(d.getDay() + 6) % 7];
-function contarSequencia(semana) {
-  const hojeIdx = DIAS.indexOf(diaAtual(new Date()));
-  let contagem = 0;
-  for (let i = hojeIdx; i >= 0; i--) {
-    if (semana[DIAS[i]]) contagem++; else break;
-  }
-  return contagem;
-}
 const MESES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
 const DIAS_UTEIS = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex'];
 
@@ -429,42 +421,12 @@ async function concederEmblema(nome, tipo, periodo) {
 // marcos de dias seguidos que valem emblema
 const SEQUENCIA_MARCOS = [3, 7, 14, 30, 60, 100];
 
-// chamado toda vez que alguém completa o quiz do dia: atualiza a
-// sequência (streak) persistente da pessoa e premia marcos alcançados.
-// guardado de forma independente da "trilha" semanal (que é só visual),
-// então a sequência não quebra sozinha ao virar a semana.
-async function atualizarSequenciaEEmblemas(nome) {
-  const hoje = new Date();
-  const did = dateId(hoje);
-  const ontemId = dateId(new Date(hoje.getTime() - 86400000));
-
-  let dados = { atual: 0, ultimoDia: null };
-  try {
-    const r = await window.storage.get(`streak:${nome}`, true);
-    if (r && r.value) dados = JSON.parse(r.value);
-  } catch { /* primeira vez dessa pessoa */ }
-
-  if (dados.ultimoDia === did) return dados.atual; // já contabilizado hoje
-
-  dados.atual = dados.ultimoDia === ontemId ? dados.atual + 1 : 1;
-  dados.ultimoDia = did;
-
-  try {
-    await window.storage.set(`streak:${nome}`, JSON.stringify(dados), true);
-  } catch { /* se falhar, tenta de novo na próxima resposta */ }
-
-  await Promise.all(
-    SEQUENCIA_MARCOS.filter((marco) => marco === dados.atual).map((marco) => concederEmblema(nome, 'sequencia', String(marco)))
-  );
-
-  return dados.atual;
-}
-
-// streak "de acesso" — conta os dias seguidos que a pessoa ABRE o app,
-// independente de fazer o quiz. Guardada à parte da sequência do quiz
-// (acima), pra não misturar as duas coisas. Retorna null quando o acesso
-// de hoje já tinha sido contabilizado (assim a tela de boas-vindas só
-// aparece uma vez por dia).
+// única sequência (streak) do app: conta os dias seguidos que a pessoa
+// ABRE o app (não depende de fazer o quiz). É o número usado em todo
+// lugar — perfil, emblemas de marco e a tela da lâmpada — pra não ter
+// contagens diferentes com o mesmo nome "dias seguidos".
+// `novoDia` indica se hoje é a primeira vez que essa função roda pra
+// essa pessoa (assim a tela de boas-vindas só aparece uma vez por dia).
 async function atualizarSequenciaAcesso(nome) {
   const hoje = new Date();
   const did = dateId(hoje);
@@ -477,13 +439,20 @@ async function atualizarSequenciaAcesso(nome) {
     if (r && r.value) dados = JSON.parse(r.value);
   } catch { /* primeiro acesso dessa pessoa */ }
 
-  if (dados.ultimoDia === did) return null; // já contabilizado hoje
+  if (dados.ultimoDia === did) {
+    // já contabilizado hoje — só devolve o número atual, sem repetir a tela
+    return { atual: dados.atual, semana: null, novoDia: false };
+  }
 
   dados.atual = dados.ultimoDia === ontemId ? dados.atual + 1 : 1;
   dados.ultimoDia = did;
   try {
     await window.storage.set(`streak-acesso:${nome}`, JSON.stringify(dados), true);
   } catch { /* tenta de novo no próximo acesso */ }
+
+  await Promise.all(
+    SEQUENCIA_MARCOS.filter((marco) => marco === dados.atual).map((marco) => concederEmblema(nome, 'sequencia', String(marco)))
+  );
 
   // marca o dia de hoje na trilha semanal de acesso (pro calendário da tela)
   let mapaSemana = {};
@@ -497,7 +466,7 @@ async function atualizarSequenciaAcesso(nome) {
     await window.storage.set(`semana-acesso:${wid}`, JSON.stringify(mapaSemana), true);
   } catch { /* tenta de novo no próximo acesso */ }
 
-  return { atual: dados.atual, semana };
+  return { atual: dados.atual, semana, novoDia: true };
 }
 
 // roda uma vez por sessão: percebe se um dia/semana/mês "virou" desde a
@@ -1468,9 +1437,6 @@ function AbaQuiz({ nome }) {
       window.storage.set(`mes:${mid}`, JSON.stringify(rankMes), true),
     ]);
 
-    // atualiza a sequência de dias seguidos e premia marcos (7, 30 dias...)
-    atualizarSequenciaEEmblemas(nome);
-
     setSemana(dadosSemana.trilha[nome]);
     setRespostasHoje(registro);
     return registro;
@@ -1522,10 +1488,9 @@ function AbaQuiz({ nome }) {
     return <div style={{ display: 'flex', justifyContent: 'center', padding: 60 }}><Loader2 className="spin" size={22} color={cor.ouro} /></div>;
   }
 
-  const sequenciaAtual = contarSequencia(semana);
   const semanaCompleta = DIAS.every((d) => semana[d]);
   const gabaritoHoje = !!respostasHoje && respostasHoje.score === respostasHoje.total;
-  const temEmblema = sequenciaAtual > 0 || semanaCompleta || gabaritoHoje;
+  const temEmblema = semanaCompleta || gabaritoHoje;
 
   const reflexao = reflexaoDoDia(hoje);
 
@@ -1561,7 +1526,6 @@ function AbaQuiz({ nome }) {
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, margin: '2px 0 14px' }}>
           {semanaCompleta && <Emblema emoji="🏆" texto="Semana completa" />}
           {gabaritoHoje && <Emblema emoji="🎯" texto="Gabarito de hoje" />}
-          {sequenciaAtual > 0 && <Emblema emoji="🔥" texto={`${sequenciaAtual} ${sequenciaAtual === 1 ? 'dia seguido' : 'dias seguidos'}`} />}
         </div>
       )}
 
@@ -4097,7 +4061,7 @@ function PerfilMembro({ membro, onFechar }) {
         window.storage.get(`mes:${mid}`, true),
         window.storage.get(`escala:${mid}`, true),
         window.storage.get(`emblemas:${membro.nome}`, true),
-        window.storage.get(`streak:${membro.nome}`, true),
+        window.storage.get(`streak-acesso:${membro.nome}`, true),
       ]);
       setPontosMes(rMes.status === 'fulfilled' && rMes.value ? (JSON.parse(rMes.value.value)[membro.nome] || 0) : 0);
       setDiasEscalados(
@@ -4259,7 +4223,7 @@ export default function App() {
     if (!nome) return;
     (async () => {
       const resultado = await atualizarSequenciaAcesso(nome);
-      if (resultado) setSequenciaAcessoTela(resultado);
+      if (resultado?.novoDia) setSequenciaAcessoTela(resultado);
     })();
   }, [nome]);
 
