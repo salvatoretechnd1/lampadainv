@@ -985,6 +985,7 @@ const POSICOES_ORBITA = [
   { angulo: 100, raio: 92, tamanho: 44 },
   { angulo: 175, raio: 120, tamanho: 52 },
   { angulo: 245, raio: 68, tamanho: 40 },
+  { angulo: 60, raio: 105, tamanho: 48 },
 ];
 
 function OrbitaMembros({ membros, onSelecionar }) {
@@ -1093,6 +1094,8 @@ function TelaNome({ onEntrar, membros, onCadastrarMembro }) {
   const [modo, setModo] = useState('entrar'); // 'entrar' | 'cadastrar'
   const [processando, setProcessando] = useState(false);
   const [erro, setErro] = useState('');
+  const [fotoFile, setFotoFile] = useState(null);
+  const [fotoPreview, setFotoPreview] = useState('');
 
   const trocarModo = (novoModo) => {
     setModo(novoModo);
@@ -1100,10 +1103,20 @@ function TelaNome({ onEntrar, membros, onCadastrarMembro }) {
     setSenha('');
   };
 
+  const escolherFoto = (file) => {
+    if (!file) return;
+    setFotoFile(file);
+    setErro('');
+    const leitor = new FileReader();
+    leitor.onload = () => setFotoPreview(leitor.result);
+    leitor.readAsDataURL(file);
+  };
+
   const confirmar = async () => {
     const nomeLimpo = valor.trim();
     if (!nomeLimpo) return;
     if (!senha.trim()) { setErro('Digite uma senha.'); return; }
+    if (modo === 'cadastrar' && !fotoFile) { setErro('Escolha uma foto de perfil pra se cadastrar.'); return; }
     setErro('');
     setProcessando(true);
     const chave = `conta:${nomeLimpo.toLowerCase()}`;
@@ -1124,7 +1137,7 @@ function TelaNome({ onEntrar, membros, onCadastrarMembro }) {
         const jaEhMembro = membros.some((m) => m.nome.trim().toLowerCase() === nomeLimpo.toLowerCase());
         const aniversario = diaNiver && mesNiver ? `${diaNiver}/${mesNiver}` : '';
         if (!jaEhMembro && onCadastrarMembro) {
-          await onCadastrarMembro(nomeLimpo, aniversario);
+          await onCadastrarMembro(nomeLimpo, aniversario, fotoFile);
         }
         onEntrar(nomeLimpo);
       } else {
@@ -1177,6 +1190,33 @@ function TelaNome({ onEntrar, membros, onCadastrarMembro }) {
             Cadastrar
           </button>
         </div>
+
+        {modo === 'cadastrar' && (
+          <div style={{ marginBottom: 12, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+            <label htmlFor="foto-cadastro" style={{ cursor: 'pointer', position: 'relative', display: 'block' }}>
+              <div style={{
+                width: 72, height: 72, borderRadius: '50%', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                background: 'rgba(22,27,51,0.35)', border: `1.5px dashed ${fotoPreview ? cor.ouro : 'rgba(245,239,224,0.35)'}`,
+              }}>
+                {fotoPreview ? (
+                  <img src={fotoPreview} alt="Sua foto" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                ) : (
+                  <Camera size={22} color="rgba(245,239,224,0.55)" />
+                )}
+              </div>
+              <div style={{ position: 'absolute', bottom: -2, right: -2, width: 22, height: 22, borderRadius: '50%', background: cor.ouro, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid #161B33' }}>
+                <Camera size={11} color="#161B33" />
+              </div>
+            </label>
+            <input
+              id="foto-cadastro" type="file" accept="image/*" style={{ display: 'none' }}
+              onChange={(e) => escolherFoto(e.target.files[0])}
+            />
+            <span style={{ fontFamily: 'Inter', fontSize: 11, color: 'rgba(245,239,224,0.6)' }}>
+              {fotoPreview ? 'Foto escolhida' : 'Toque pra escolher uma foto (obrigatório)'}
+            </span>
+          </div>
+        )}
 
         <input
           value={valor}
@@ -1235,11 +1275,13 @@ function TelaNome({ onEntrar, membros, onCadastrarMembro }) {
 
         <button
           onClick={confirmar}
-          disabled={!valor.trim() || !senha.trim() || processando}
+          disabled={!valor.trim() || !senha.trim() || (modo === 'cadastrar' && !fotoFile) || processando}
           style={{
             width: '100%', maxWidth: 280, padding: '13px 16px', borderRadius: 12, border: 'none',
-            background: valor.trim() && senha.trim() ? cor.ouro : cor.mudoSuave, color: valor.trim() && senha.trim() ? '#161B33' : cor.mudo,
-            fontFamily: 'Inter', fontWeight: 700, fontSize: 15, cursor: valor.trim() && senha.trim() ? 'pointer' : 'default',
+            background: valor.trim() && senha.trim() && (modo !== 'cadastrar' || fotoFile) ? cor.ouro : cor.mudoSuave,
+            color: valor.trim() && senha.trim() && (modo !== 'cadastrar' || fotoFile) ? '#161B33' : cor.mudo,
+            fontFamily: 'Inter', fontWeight: 700, fontSize: 15,
+            cursor: valor.trim() && senha.trim() && (modo !== 'cadastrar' || fotoFile) ? 'pointer' : 'default',
           }}
         >
           {processando ? 'Só um instante…' : modo === 'cadastrar' ? 'Criar conta' : 'Entrar'}
@@ -4227,11 +4269,19 @@ export default function App() {
     window.storage.set('meu-tema', novo, false).catch(() => {});
   };
 
-  const adicionarMembro = async (nomeNovo, aniversarioNovo) => {
+  const adicionarMembro = async (nomeNovo, aniversarioNovo, fotoFile) => {
     const novo = { id: gerarId(), nome: nomeNovo, aniversario: aniversarioNovo || undefined };
     const lista = [...membrosBase, novo];
     setMembrosBase(lista);
     try { await window.storage.set('membros', JSON.stringify(lista), true); } catch { /* tenta depois */ }
+    if (fotoFile) {
+      try {
+        const base64 = await redimensionarImagem(fotoFile);
+        const novasFotos = { ...fotos, [novo.id]: base64 };
+        setFotos(novasFotos);
+        await window.storage.set('fotos', JSON.stringify(novasFotos), true);
+      } catch { /* ignora falha pontual */ }
+    }
   };
 
   const removerMembro = async (id) => {
