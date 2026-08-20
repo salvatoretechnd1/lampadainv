@@ -5,7 +5,7 @@ import {
   Sun, Moon, Share2, Cake, BellRing, ArrowLeft, Sparkles, LogOut, Gem, Award, RefreshCw,
   CalendarClock, AlertTriangle,
   Megaphone, Clock, MapPin, Star, Pencil, Send, CheckCircle2, ImagePlus, Download,
-  GraduationCap, ArrowUpDown,
+  GraduationCap, ArrowUpDown, Lightbulb,
 } from 'lucide-react';
 
 /* ---------------------------------------------------------
@@ -458,6 +458,46 @@ async function atualizarSequenciaEEmblemas(nome) {
   );
 
   return dados.atual;
+}
+
+// streak "de acesso" — conta os dias seguidos que a pessoa ABRE o app,
+// independente de fazer o quiz. Guardada à parte da sequência do quiz
+// (acima), pra não misturar as duas coisas. Retorna null quando o acesso
+// de hoje já tinha sido contabilizado (assim a tela de boas-vindas só
+// aparece uma vez por dia).
+async function atualizarSequenciaAcesso(nome) {
+  const hoje = new Date();
+  const did = dateId(hoje);
+  const ontemId = dateId(new Date(hoje.getTime() - 86400000));
+  const wid = weekId(hoje);
+
+  let dados = { atual: 0, ultimoDia: null };
+  try {
+    const r = await window.storage.get(`streak-acesso:${nome}`, true);
+    if (r && r.value) dados = JSON.parse(r.value);
+  } catch { /* primeiro acesso dessa pessoa */ }
+
+  if (dados.ultimoDia === did) return null; // já contabilizado hoje
+
+  dados.atual = dados.ultimoDia === ontemId ? dados.atual + 1 : 1;
+  dados.ultimoDia = did;
+  try {
+    await window.storage.set(`streak-acesso:${nome}`, JSON.stringify(dados), true);
+  } catch { /* tenta de novo no próximo acesso */ }
+
+  // marca o dia de hoje na trilha semanal de acesso (pro calendário da tela)
+  let mapaSemana = {};
+  try {
+    const r = await window.storage.get(`semana-acesso:${wid}`, true);
+    if (r && r.value) mapaSemana = JSON.parse(r.value);
+  } catch { /* primeira vez nessa semana */ }
+  const semana = { ...(mapaSemana[nome] || {}), [diaAtual(hoje)]: true };
+  mapaSemana[nome] = semana;
+  try {
+    await window.storage.set(`semana-acesso:${wid}`, JSON.stringify(mapaSemana), true);
+  } catch { /* tenta de novo no próximo acesso */ }
+
+  return { atual: dados.atual, semana };
 }
 
 // roda uma vez por sessão: percebe se um dia/semana/mês "virou" desde a
@@ -946,6 +986,58 @@ function TelaConquistaGabarito({ nome, total, onFechar }) {
   );
 }
 
+
+/* ---------------------------------------------------------
+   TELA: SEQUÊNCIA DE ACESSO (lâmpada acendendo, uma vez por dia)
+--------------------------------------------------------- */
+function TelaSequenciaAcesso({ nome, dias, semana, onContinuar }) {
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 90, display: 'flex', justifyContent: 'center',
+      background: `radial-gradient(circle at 50% 26%, ${cor.painelAlt} 0%, ${cor.bg} 65%)`,
+      animation: 'conquista-fundo-surge 0.4s ease',
+    }}>
+      <div style={{ width: '100%', maxWidth: 440, display: 'flex', flexDirection: 'column', minHeight: '100vh', padding: '36px 24px calc(28px + env(safe-area-inset-bottom))' }}>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center' }}>
+          <div style={{ position: 'relative', width: 152, height: 152, marginBottom: 20 }}>
+            <div className="medalha-brilho" style={{
+              position: 'absolute', inset: 0, borderRadius: '50%',
+              background: 'radial-gradient(circle, rgba(227,178,60,0.38), transparent 70%)',
+            }} />
+            <div style={{
+              position: 'absolute', inset: 20, borderRadius: '50%',
+              background: `radial-gradient(circle at 35% 30%, ${cor.ouroSuave}, ${cor.ouro} 60%, #9C7420 100%)`,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              boxShadow: 'inset 0 -6px 14px rgba(0,0,0,0.25), inset 0 6px 14px rgba(255,255,255,0.35), 0 0 46px rgba(227,178,60,0.6)',
+              animation: 'medalha-entrar 0.7s cubic-bezier(0.34, 1.56, 0.64, 1)',
+            }}>
+              <Lightbulb size={54} color="#161B33" fill="#161B33" />
+            </div>
+          </div>
+
+          <h1 style={{ fontFamily: 'Fraunces', fontWeight: 700, fontSize: 44, color: cor.texto, margin: '0 0 2px' }}>{dias}</h1>
+          <p style={{ fontFamily: 'Inter', fontSize: 13, fontWeight: 700, color: cor.mudo, margin: '0 0 6px', textTransform: 'uppercase', letterSpacing: 0.6 }}>
+            {dias === 1 ? 'dia seguido' : 'dias seguidos'}
+          </p>
+          <p style={{ fontFamily: 'Inter', fontSize: 13, color: cor.mudo, margin: '0 0 24px', lineHeight: 1.5, maxWidth: 280 }}>
+            Continue acessando a Lâmpada todo dia pra manter sua sequência acesa, {nome.split(' ')[0]}.
+          </p>
+
+          <div style={{ width: '100%', background: cor.painel, border: `1px solid ${cor.borda}`, borderRadius: 16, padding: '2px 12px 8px' }}>
+            <TrilhaDeLuz semana={semana} />
+          </div>
+        </div>
+
+        <button
+          onClick={onContinuar}
+          style={{ width: '100%', padding: '14px', borderRadius: 12, border: 'none', background: cor.ouro, color: '#161B33', fontFamily: 'Inter', fontWeight: 700, fontSize: 15, cursor: 'pointer' }}
+        >
+          Continuar
+        </button>
+      </div>
+    </div>
+  );
+}
 
 /* ---------------------------------------------------------
    COMPONENTE: TRILHA DE LUZ
@@ -4121,6 +4213,7 @@ export default function App() {
 
   const [avisoDevocionalPendente, setAvisoDevocionalPendente] = useState(false);
   const [avisosNaoVistos, setAvisosNaoVistos] = useState(false);
+  const [sequenciaAcessoTela, setSequenciaAcessoTela] = useState(null);
 
   // aplicado direto no corpo do render (não em useEffect) — assim os
   // componentes filhos já leem a cor certa nesta mesma passada, sem
@@ -4158,6 +4251,17 @@ export default function App() {
   }, []);
 
   const membros = membrosBase.map((m) => ({ ...m, foto: fotos[m.id] }));
+
+  // toda vez que alguém entra no app (login novo ou sessão salva), atualiza
+  // a sequência de dias seguidos acessando e, se for o primeiro acesso de
+  // hoje, mostra a tela da lâmpada acendendo com a contagem.
+  useEffect(() => {
+    if (!nome) return;
+    (async () => {
+      const resultado = await atualizarSequenciaAcesso(nome);
+      if (resultado) setSequenciaAcessoTela(resultado);
+    })();
+  }, [nome]);
 
   // "presença" — avisa o grupo (visível só pros líderes) que esse nome está com o app aberto
   useEffect(() => {
@@ -4334,6 +4438,20 @@ export default function App() {
           <Flame size={30} color="#161B33" fill="#161B33" />
         </div>
         <span style={{ fontFamily: 'Fraunces', fontWeight: 600, fontSize: 20, color: cor.texto }}>Lâmpada</span>
+      </div>
+    );
+  }
+
+  if (sequenciaAcessoTela) {
+    return (
+      <div style={{ minHeight: '100vh', background: cor.bg, display: 'flex', justifyContent: 'center' }}>
+        <style>{fontes}</style>
+        <TelaSequenciaAcesso
+          nome={nome}
+          dias={sequenciaAcessoTela.atual}
+          semana={sequenciaAcessoTela.semana}
+          onContinuar={() => setSequenciaAcessoTela(null)}
+        />
       </div>
     );
   }
