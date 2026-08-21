@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import RotatingText from './RotatingText/RotatingText';
 import {
   Flame, BookOpen, Trophy, CalendarDays, Check, X, Lock, Crown, Users, Loader2,
   Camera, Mic, ChevronLeft, ChevronRight, Plus, Trash2, FileText,
@@ -350,6 +351,25 @@ const REFLEXOES = [
 function reflexaoDoDia(d) {
   const epochDay = Math.floor(d.getTime() / 86400000);
   return REFLEXOES[epochDay % REFLEXOES.length];
+}
+
+// card do "versículo do dia" — reaproveitado na aba Quiz e na tela da
+// lâmpada, sempre com a mesma cara (fundo dourado suave, ícone de lâmpada,
+// citação em destaque) pra reforçar o lado espiritual do app, não só o jogo.
+function CardVersiculoDoDia({ reflexao }) {
+  return (
+    <div style={{
+      background: 'linear-gradient(160deg, rgba(227,178,60,0.16), rgba(227,178,60,0.05))',
+      border: `1px solid rgba(227,178,60,0.35)`, borderRadius: 16, padding: '18px 18px 16px',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 10 }}>
+        <Lightbulb size={16} color={cor.ouro} fill={cor.ouro} />
+        <span style={{ fontFamily: 'Inter', fontSize: 11.5, fontWeight: 700, color: cor.ouro, textTransform: 'uppercase', letterSpacing: 0.6 }}>Versículo do dia</span>
+      </div>
+      <p style={{ fontFamily: 'Fraunces', fontStyle: 'italic', fontWeight: 500, fontSize: 17, color: cor.texto, lineHeight: 1.5, margin: '0 0 8px' }}>&ldquo;{reflexao.texto}&rdquo;</p>
+      <p style={{ fontFamily: 'Inter', fontSize: 12, color: cor.mudo, margin: 0 }}>{reflexao.ref} · {reflexao.versao}</p>
+    </div>
+  );
 }
 
 // compartilhamento nativo (com fallback pra copiar o texto)
@@ -828,6 +848,9 @@ body { margin: 0; }
 .medalha-brilho { animation: medalha-girar 6s linear infinite; }
 @keyframes medalha-entrar { 0% { transform: scale(0) rotate(-25deg); opacity: 0; } 60% { transform: scale(1.12) rotate(6deg); opacity: 1; } 100% { transform: scale(1) rotate(0deg); opacity: 1; } }
 @keyframes conquista-fundo-surge { from { opacity: 0; } to { opacity: 1; } }
+.rotating-versiculo { display: inline-flex; align-items: center; background: #E3B23C; color: #161B33; padding: 3px 12px 5px; border-radius: 9px; }
+.rotating-versiculo .text-rotate-word { overflow: hidden; padding-bottom: 0.15em; margin-bottom: -0.15em; margin-right: 0.28em; }
+.rotating-versiculo .text-rotate-word:last-child { margin-right: 0; }
 `;
 
 /* ---------------------------------------------------------
@@ -960,6 +983,7 @@ function TelaConquistaGabarito({ nome, total, onFechar }) {
    TELA: SEQUÊNCIA DE ACESSO (lâmpada acendendo, uma vez por dia)
 --------------------------------------------------------- */
 function TelaSequenciaAcesso({ nome, dias, semana, onContinuar }) {
+  const reflexao = reflexaoDoDia(new Date());
   return (
     <div style={{
       position: 'fixed', inset: 0, zIndex: 90, display: 'flex', justifyContent: 'center',
@@ -992,8 +1016,12 @@ function TelaSequenciaAcesso({ nome, dias, semana, onContinuar }) {
             Continue acessando a Lâmpada todo dia pra manter sua sequência acesa, {nome.split(' ')[0]}.
           </p>
 
-          <div style={{ width: '100%', background: cor.painel, border: `1px solid ${cor.borda}`, borderRadius: 16, padding: '2px 12px 8px' }}>
+          <div style={{ width: '100%', background: cor.painel, border: `1px solid ${cor.borda}`, borderRadius: 16, padding: '2px 12px 8px', marginBottom: 14 }}>
             <TrilhaDeLuz semana={semana} />
+          </div>
+
+          <div style={{ width: '100%', textAlign: 'left' }}>
+            <CardVersiculoDoDia reflexao={reflexao} />
           </div>
         </div>
 
@@ -1347,6 +1375,25 @@ function TelaNome({ onEntrar, membros, onCadastrarMembro }) {
         >
           {processando ? 'Só um instante…' : modo === 'cadastrar' ? 'Criar conta' : 'Entrar'}
         </button>
+
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+          marginTop: 16, fontFamily: 'Inter', fontSize: 14, color: cor.texto,
+        }}>
+          <span style={{ fontWeight: 700, letterSpacing: 0.4 }}>EU SOU</span>
+          <RotatingText
+            texts={['filho de Deus', 'nova criatura', 'em Cristo mais que vencedor']}
+            mainClassName="rotating-versiculo"
+            style={{ fontWeight: 700, fontSize: 14 }}
+            staggerFrom="last"
+            staggerDuration={0.025}
+            transition={{ type: 'spring', damping: 30, stiffness: 400 }}
+            rotationInterval={2600}
+            splitBy="characters"
+            auto
+            loop
+          />
+        </div>
       </div>
 
       <div style={{ width: '100%', maxWidth: 280, margin: '18px auto 0' }}>
@@ -1513,13 +1560,8 @@ function AbaQuiz({ nome }) {
       {mostrarConquista && (
         <TelaConquistaGabarito nome={nome} total={respostasHoje?.total || perguntas.length} onFechar={() => setMostrarConquista(false)} />
       )}
-      <div style={{ background: cor.painelAlt, border: `1px solid ${cor.borda}`, borderRadius: 14, padding: '14px 16px', marginBottom: 6 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
-          <Sparkles size={13} color={cor.ouro} />
-          <span style={{ fontFamily: 'Inter', fontSize: 11, fontWeight: 700, color: cor.ouro, textTransform: 'uppercase', letterSpacing: 0.4 }}>Versículo do dia</span>
-        </div>
-        <p style={{ fontFamily: 'Fraunces', fontStyle: 'italic', fontSize: 14.5, color: cor.texto, lineHeight: 1.55, margin: '0 0 6px' }}>&ldquo;{reflexao.texto}&rdquo;</p>
-        <p style={{ fontFamily: 'Inter', fontSize: 11.5, color: cor.mudo, margin: 0 }}>{reflexao.ref} · {reflexao.versao}</p>
+      <div style={{ marginBottom: 6 }}>
+        <CardVersiculoDoDia reflexao={reflexao} />
       </div>
       <TrilhaDeLuz semana={semana} />
       {temEmblema && (
