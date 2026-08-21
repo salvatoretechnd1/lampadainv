@@ -848,7 +848,7 @@ body { margin: 0; }
 .medalha-brilho { animation: medalha-girar 6s linear infinite; }
 @keyframes medalha-entrar { 0% { transform: scale(0) rotate(-25deg); opacity: 0; } 60% { transform: scale(1.12) rotate(6deg); opacity: 1; } 100% { transform: scale(1) rotate(0deg); opacity: 1; } }
 @keyframes conquista-fundo-surge { from { opacity: 0; } to { opacity: 1; } }
-.rotating-versiculo { display: inline-flex; align-items: center; background: #E3B23C; color: #161B33; padding: 3px 12px 5px; border-radius: 9px; }
+.rotating-versiculo { display: inline-flex; align-items: center; background: #E3B23C; color: #161B33; padding: 3px 12px 5px; border-radius: 9px; text-transform: uppercase; }
 .rotating-versiculo .text-rotate-word { overflow: hidden; padding-bottom: 0.15em; margin-bottom: -0.15em; }
 `;
 
