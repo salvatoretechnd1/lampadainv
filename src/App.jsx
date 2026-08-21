@@ -1381,7 +1381,7 @@ function TelaNome({ onEntrar, membros, onCadastrarMembro }) {
         }}>
           <span style={{ fontWeight: 700, letterSpacing: 0.4 }}>EU SOU</span>
           <RotatingText
-            texts={['filho de Deus', 'nova criatura', 'em Cristo mais que vencedor']}
+            texts={['FILHO DE DEUS', 'NOVA CRIATURA', 'EM CRISTO MAIS QUE VENCEDOR']}
             mainClassName="rotating-versiculo"
             style={{ fontWeight: 700, fontSize: 14 }}
             staggerFrom="last"
